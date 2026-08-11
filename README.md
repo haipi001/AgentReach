@@ -68,7 +68,9 @@ SELF SPACE
 
 The Self Space now includes a local-first Persona Studio. Users can customize the Personal Agent's display name, human face shape, skin, eyes, hair, abstract form, finish, signal color, and aura intensity. A rigged GLB can be loaded from the device for the current session without uploading it. Appearance preferences never alter identity, policy, or permissions. See [the human avatar architecture](docs/human-avatar-architecture.md).
 
-The default SELF stage uses an authored faceless BASE with separate MASK and ARMOR image layers, plus local R3F light and evidence layers. The torso is the visual anchor while capability slots expand around it and into the long-form anatomy view. High-fidelity 3D activates only when the user imports a suitable rigged GLB.
+The SELF experience is a presentation layer for protocol state, not the product's proof boundary. Its current interactive portrait and local R3F renderer visualize identity, capability and evidence without changing Identity, Policy, Memory or Action Grants. The authoritative proof remains the deterministic protocol service, durable world effects, independent verification and replayable Trace.
+
+The competition narrative and measurable acceptance criteria are fixed in [the Golden Scenario contract](docs/golden-scenario.md). Visual work is frozen for the preliminary submission except for accessibility, performance or demo-blocking defects.
 
 The GitHub integration is intentionally an honest local sandbox in this zero-dependency gate: its output lives under `data/demo-world/github/agentreach/`. The privacy attack can be run from the Trace panel without derailing the Golden Loop.
 
@@ -100,6 +102,8 @@ python3 -m pytest -q
 cd apps/web && pnpm lint && pnpm build
 pnpm test:e2e
 ```
+
+The current deterministic baseline covers nine automated service/API tests, including the successful world-action loop, idempotent connector replay, expired-claim exclusion, peer rejection, invalid transitions and an independent privacy-denial branch.
 
 ## Safety boundary
 
