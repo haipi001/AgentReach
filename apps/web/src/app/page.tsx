@@ -10,6 +10,7 @@ import { ExperienceFrame } from "@/components/experience/ExperienceFrame";
 import { ProductWorkspace } from "@/components/workspace/ProductWorkspace";
 import { SystemPanel } from "@/components/system/SystemPanel";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { IdentityLoadout } from "@/components/identity/IdentityLoadout";
 import { demoApi } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent-store";
 
@@ -18,6 +19,7 @@ export default function Home() {
   const setDemo = useAgentStore((s) => s.setDemo);
   useEffect(() => { demoApi.get().then(setDemo).catch(() => undefined); }, [setDemo]);
   return <ExperienceFrame>
+    {view === "identity" && <IdentityLoadout />}
     {view === "self" && <ProductWorkspace />}
     <SystemPanel />
     <NotificationCenter />

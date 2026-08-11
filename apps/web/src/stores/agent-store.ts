@@ -24,7 +24,7 @@ type Store = {
 };
 
 export const useAgentStore = create<Store>()(persist((set) => ({
-  view: "self",
+  view: "identity",
   agentState: "idle",
   activeOrbit: null,
   demo: null,

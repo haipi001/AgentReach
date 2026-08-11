@@ -1,5 +1,5 @@
 export type AgentState = "idle" | "thinking" | "searching" | "waiting_approval" | "connected";
-export type ViewMode = "self" | "reach" | "capsule" | "connected";
+export type ViewMode = "identity" | "self" | "reach" | "capsule" | "connected";
 export type PersonaForm = "human" | "monolith" | "orbital" | "totem";
 export type PersonaFinish = "matte" | "chrome" | "porcelain";
 export type FaceShape = "soft" | "oval" | "angular";
@@ -78,6 +78,7 @@ export type NotificationResult = { unread: number; total: number; items: Notific
 export type DemoState = {
   stage: string;
   trace_id: string;
+  human_request: string | null;
   candidates: Candidate[];
   selected_candidate: Candidate | null;
   capsule: Record<string, unknown> | null;

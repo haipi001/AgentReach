@@ -1,0 +1,63 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { AgentStage } from "@/components/spatial/AgentStage";
+import { demoApi, memoryApi } from "@/lib/api";
+import { zh } from "@/lib/i18n";
+import { useAgentStore } from "@/stores/agent-store";
+import type { MemoryRecord } from "@/types/agent";
+
+type LoadoutSection = "relationship" | "parameters" | "skills" | "memory" | "projects" | "boundary";
+
+const SECTION_META: Record<LoadoutSection, { index: string; label: string; title: string; description: string }> = {
+  relationship: { index: "01", label: "RELATION", title: "你与 HAIPI", description: "它不是公开人格，而是你的私人行动代理。身份、记忆与边界都由你控制。" },
+  parameters: { index: "02", label: "PARAMETERS", title: "智能体参数", description: "形态、自治等级、运行状态与当前上下文共同决定它如何出现和行动。" },
+  skills: { index: "03", label: "SKILLS", title: "已装载技能", description: "每个 Skill 都绑定明确 Worker；调用会进入持久队列并留下 Trace。" },
+  memory: { index: "04", label: "MEMORY", title: "可信记忆", description: "只有独立验证通过的经验才能进入本地记忆库，并且可以随时遗忘。" },
+  projects: { index: "05", label: "PROJECTS", title: "任务与项目", description: "每个项目拥有独立 Run 快照；可暂停、恢复、切换或只读查看。" },
+  boundary: { index: "06", label: "BOUNDARY", title: "边界与连接", description: "世界行动必须通过范围授权、强审批、连接器健康检查和独立验证。" },
+};
+
+export function IdentityLoadout() {
+  const demo = useAgentStore((state) => state.demo);
+  const persona = useAgentStore((state) => state.persona);
+  const setDemo = useAgentStore((state) => state.setDemo);
+  const setView = useAgentStore((state) => state.setView);
+  const openStudio = useAgentStore((state) => state.setPersonaStudioOpen);
+  const [active, setActive] = useState<LoadoutSection>("relationship");
+  const [memories, setMemories] = useState<MemoryRecord[]>([]);
+  const [busyRun, setBusyRun] = useState<string | null>(null);
+
+  useEffect(() => { memoryApi.search("").then((result) => setMemories(result.items)).catch(() => setMemories([])); }, []);
+  const current = SECTION_META[active];
+  const activeAgents = demo?.agents.filter((agent) => agent.status === "ACTIVE").length ?? 0;
+  const healthyConnectors = demo?.connector_runtime.connectors.filter((connector) => connector.enabled && connector.status === "HEALTHY").length ?? 0;
+  const projects = useMemo(() => demo?.runtime.history.slice(0, 8) ?? [], [demo?.runtime.history]);
+
+  async function openProject(runId: string) {
+    if (!demo || busyRun) return;
+    setBusyRun(runId);
+    try {
+      const next = runId === demo.runtime.run_id ? demo : await demoApi.switchRun(runId);
+      setDemo(next); setView("self");
+    } finally { setBusyRun(null); }
+  }
+
+  const detail = {
+    relationship: <div className="loadout-relationship"><div className="relation-line"><span>YOU</span><i/><span>{persona.name}</span></div><dl><div><dt>所有者</dt><dd>HAIPI / 本地身份</dd></div><div><dt>关系</dt><dd>私人代理 / 非公开 Profile</dd></div><div><dt>自治</dt><dd>L2 默认 · L3 强确认</dd></div><div><dt>信任</dt><dd>证据先于记忆</dd></div></dl><blockquote>“我的上下文留在身边。只有我决定时，它才向外抵达。”</blockquote></div>,
+    parameters: <div className="loadout-specs"><dl><div><dt>形态</dt><dd>{persona.form.toUpperCase()}</dd></div><div><dt>材质</dt><dd>{persona.finish.toUpperCase()}</dd></div><div><dt>信号强度</dt><dd>{Math.round(persona.aura * 100)}%</dd></div><div><dt>运行状态</dt><dd>{demo?.runtime.status ?? "OFFLINE"}</dd></div><div><dt>当前阶段</dt><dd>{demo?.stage ?? "LOADING"}</dd></div><div><dt>活跃 Worker</dt><dd>{activeAgents}</dd></div></dl><button onClick={() => openStudio(true)}>调整虚拟形态 ↗</button></div>,
+    skills: <div className="loadout-items">{demo?.skills.map((skill, index) => <article key={skill.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{zh(skill.id)}</strong><p>{skill.description}</p></div><aside><b>{skill.status}</b><small>{skill.invocations} 次调用 · v{skill.version}</small></aside></article>)}</div>,
+    memory: <div className="loadout-items">{memories.length ? memories.map((memory, index) => <article key={memory.memory_id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{memory.summary}</strong><p>{memory.kind} · TRACE {memory.trace_id}</p></div><aside><b>{memory.verified ? "VERIFIED" : "UNVERIFIED"}</b><small>可信度 {Math.round(memory.score * 100)}%</small></aside></article>) : <div className="loadout-empty"><b>0 VERIFIED MEMORY</b><p>完成一次经过 Verifier 的现实行动后，可信经验会出现在这里。</p></div>}</div>,
+    projects: <div className="loadout-items">{projects.map((run, index) => <article key={run.run_id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{run.human_request || "未命名任务"}</strong><p>{run.stage} · ATTEMPT {run.attempt}</p></div><aside><b>{run.status}</b><button disabled={!!busyRun || !run.recoverable && run.run_id !== demo?.runtime.run_id} onClick={() => openProject(run.run_id)}>{busyRun === run.run_id ? "读取中" : run.run_id === demo?.runtime.run_id ? "进入" : run.recoverable ? "装载" : "旧记录"}</button></aside></article>)}</div>,
+    boundary: <div className="loadout-boundary"><div className="boundary-meter"><strong>{healthyConnectors}/{demo?.connector_runtime.connectors.length ?? 0}</strong><span>连接器就绪</span></div><ul>{demo?.privacy_invariants.map((rule, index) => <li key={rule}><span>0{index + 1}</span>{rule}</li>)}</ul><div className="connector-strips">{demo?.connector_runtime.connectors.map((connector) => <div key={connector.id}><i className={connector.status.toLowerCase()}/><strong>{connector.id}</strong><span>{connector.enabled ? connector.status : "DISABLED"}</span></div>)}</div></div>,
+  }[active];
+
+  return <section className="identity-loadout" aria-label="AI 身份装载界面">
+    <header className="loadout-heading"><span>PERSONAL AI / IDENTITY LOADOUT</span><h1>我与我的 <em>AI。</em></h1><p>不是一个聊天窗口。它是我持续装载、校准并授权行动的私人智能体。</p></header>
+    <aside className="loadout-score"><span>RELATION LEVEL</span><strong>07</strong><i><b style={{ width: "78%" }}/></i><small>PRIVATE TRUST / VERIFIED</small></aside>
+    <div className="loadout-avatar"><AgentStage/><div className="avatar-tag"><span>{persona.name} / PERSONAL AGENT</span><b>{demo?.runtime.status ?? "LOCAL"}</b></div><div className="scan-line"/></div>
+    <nav className="loadout-slots" aria-label="AI 装载分类">{(Object.keys(SECTION_META) as LoadoutSection[]).map((id) => { const item = SECTION_META[id]; const count = id === "skills" ? demo?.skills.length : id === "memory" ? demo?.memory_runtime.records : id === "projects" ? demo?.runtime.history.length : undefined; return <button key={id} className={active === id ? "active" : ""} onClick={() => setActive(id)}><span>{item.index}</span><i/><div><strong>{item.label}</strong><small>{item.title}</small></div>{count !== undefined && <b>{count}</b>}</button>; })}</nav>
+    <section className="loadout-detail" aria-live="polite"><header><div><span>{current.index} / {current.label}</span><h2>{current.title}</h2></div><b>{active.toUpperCase()}</b></header><p className="detail-lead">{current.description}</p>{detail}</section>
+    <div className="loadout-actions"><button onClick={() => setView("self")}><span>进入任务空间</span><b>OPEN TASKS ↗</b></button><button onClick={() => openStudio(true)}><span>编辑 AI</span><b>CALIBRATE</b></button></div>
+  </section>;
+}
