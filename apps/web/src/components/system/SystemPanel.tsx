@@ -2,13 +2,14 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import { demoApi, memoryApi } from "@/lib/api";
+import { demoApi, identityApi, memoryApi } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent-store";
 import type { MemorySearchResult } from "@/types/agent";
 
-type SystemTab = "runs" | "agents" | "skills" | "connectors" | "memory" | "policy";
+type SystemTab = "owner" | "runs" | "agents" | "skills" | "connectors" | "memory" | "policy";
 
 const TAB_LABELS: { id: SystemTab; label: string }[] = [
+  { id: "owner", label: "OWNER" },
   { id: "runs", label: "RUNS" },
   { id: "agents", label: "AGENTS" },
   { id: "skills", label: "SKILLS" },
@@ -23,6 +24,7 @@ export function SystemPanel() {
   const demo = useAgentStore((state) => state.demo);
   const setDemo = useAgentStore((state) => state.setDemo);
   const setView = useAgentStore((state) => state.setView);
+  const setPersona = useAgentStore((state) => state.setPersona);
   const [tab, setTab] = useState<SystemTab>("runs");
   const [testing, setTesting] = useState(false);
   const [memoryQuery, setMemoryQuery] = useState("");
@@ -34,6 +36,10 @@ export function SystemPanel() {
   const [connectorBusy, setConnectorBusy] = useState<string | null>(null);
   const [confirmConnector, setConfirmConnector] = useState<string | null>(null);
   const [jobBusy, setJobBusy] = useState<string | null>(null);
+  const [identityBusy, setIdentityBusy] = useState(false);
+  const [ownerName, setOwnerName] = useState("");
+  const [agentName, setAgentName] = useState("");
+  const [identityError, setIdentityError] = useState("");
 
   async function testBoundary() {
     if (testing) return;
@@ -126,6 +132,34 @@ export function SystemPanel() {
     finally { setJobBusy(null); }
   }
 
+  async function switchIdentity(profileId: string) {
+    if (identityBusy || profileId === demo?.identity_runtime?.active_profile_id) return;
+    setIdentityBusy(true); setIdentityError("");
+    try {
+      const next = await identityApi.switch(profileId);
+      setDemo(next);
+      const profile = next.identity_runtime?.profiles.find((item) => item.active);
+      if (profile) setPersona({ name: profile.agent_name });
+      setView("identity");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) { setIdentityError(error instanceof Error ? error.message : "身份切换失败"); }
+    finally { setIdentityBusy(false); }
+  }
+
+  async function createIdentity() {
+    if (identityBusy) return;
+    setIdentityBusy(true); setIdentityError("");
+    try {
+      const runtime = await identityApi.create(ownerName, agentName);
+      const next = await demoApi.get();
+      setDemo(next);
+      const profile = runtime.profiles.find((item) => item.active);
+      if (profile) setPersona({ name: profile.agent_name });
+      setOwnerName(""); setAgentName("");
+    } catch (error) { setIdentityError(error instanceof Error ? error.message : "身份创建失败"); }
+    finally { setIdentityBusy(false); }
+  }
+
   return <AnimatePresence>{open && <>
     <motion.button className="system-scrim" aria-label="关闭系统控制面" onClick={() => setOpen(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}/>
     <motion.aside className="system-panel" aria-label="AgentReach 系统控制面" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 260, damping: 30 }}>
@@ -133,6 +167,8 @@ export function SystemPanel() {
       <nav aria-label="系统控制面分类">{TAB_LABELS.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => chooseTab(item.id)}>{item.label}</button>)}</nav>
 
       <div className="system-panel-body">
+        {tab === "owner" && <section><div className="system-panel-heading"><span>LOCAL OWNER SESSION</span><b>{demo?.identity_runtime?.local_only ? "LOCAL ONLY" : "UNAVAILABLE"}</b></div><div className="owner-session"><span>ACTIVE SESSION</span><strong>{demo?.identity_runtime?.session_id ?? "LEGACY SESSION"}</strong><p>每个本地身份拥有独立的任务、Memory、Skill、Connector 和 Inbox 数据库。</p></div><div className="owner-profiles">{demo?.identity_runtime?.profiles.map((profile) => <article key={profile.profile_id} className={profile.active ? "active" : ""}><i/><div><strong>{profile.display_name}</strong><p>{profile.agent_name} / PERSONAL AGENT</p></div><small>{profile.active ? "CURRENT" : profile.profile_id}</small>{!profile.active && <button onClick={() => switchIdentity(profile.profile_id)} disabled={identityBusy}>切换</button>}</article>)}</div>{(demo?.identity_runtime?.profiles.length ?? 0) < 5 && <form className="owner-create" onSubmit={(event) => { event.preventDefault(); createIdentity(); }}><span>CREATE ISOLATED IDENTITY</span><input value={ownerName} onChange={(event) => setOwnerName(event.target.value)} placeholder="所有者名称" maxLength={40}/><input value={agentName} onChange={(event) => setAgentName(event.target.value)} placeholder="AI 名称" maxLength={40}/><button disabled={identityBusy || !ownerName.trim() || !agentName.trim()}>{identityBusy ? "创建中" : "创建本地身份"}</button></form>}{identityError && <p className="owner-error">{identityError}</p>}</section>}
+
         {tab === "runs" && <section><div className="system-panel-heading"><span>MULTI-TASK RUNTIME</span><b>{demo?.runtime.status ?? "LOADING"}</b></div>{demo?.runtime && <><div className="run-hero"><div><span>CURRENT WORKSPACE</span><strong>{demo.human_request || "尚未输入任务"}</strong><p>{demo.stage} · ATTEMPT {demo.runtime.attempt} · {demo.runtime.run_id}</p></div><i className={demo.runtime.status.toLowerCase()}>{demo.runtime.status}</i></div><div className="run-controls"><button onClick={() => controlRun("pause")} disabled={runtimeBusy || !demo.runtime.controls.can_pause}>暂停</button><button onClick={() => controlRun("resume")} disabled={runtimeBusy || !demo.runtime.controls.can_resume}>恢复</button><button onClick={() => controlRun("cancel")} disabled={runtimeBusy || !demo.runtime.controls.can_cancel}>{confirmCancel ? "确认取消" : "取消"}</button><button onClick={() => controlRun("retry")} disabled={runtimeBusy || !demo.runtime.controls.can_retry}>重试</button></div><div className="run-history"><h3>任务工作区 <b>{demo.runtime.history.length}</b></h3>{demo.runtime.history.map((run) => { const terminal = ["COMPLETED", "CANCELLED", "FAILED", "SUPERSEDED"].includes(run.status); return <article key={run.run_id} className={run.run_id === demo.runtime.run_id ? "current" : ""}><span>{run.status}</span><div><strong>{run.human_request || "未命名任务"}</strong><p>{run.stage} · ATTEMPT {run.attempt}</p></div><small>{run.run_id}</small>{run.run_id !== demo.runtime.run_id && <button onClick={() => switchRun(run.run_id)} disabled={runtimeBusy || !run.recoverable}>{terminal ? "查看" : "切换"}</button>}</article>; })}</div></>}</section>}
 
         {tab === "agents" && <section><div className="system-panel-heading"><span>WORKER RUNTIME</span><b>{demo?.worker_queue.durable ? "DURABLE QUEUE" : "EPHEMERAL"}</b></div><div className="queue-summary"><div><span>PENDING</span><strong>{demo?.worker_queue.pending ?? 0}</strong></div><div><span>RUNNING</span><strong>{demo?.worker_queue.running ?? 0}</strong></div><div><span>FAILED</span><strong>{demo?.worker_queue.failed ?? 0}</strong></div><div><span>SUCCEEDED</span><strong>{demo?.worker_queue.succeeded ?? 0}</strong></div></div><div className="worker-jobs"><header><span>JOB QUEUE / {demo?.worker_queue.claim_mode ?? "OFFLINE"}</span><button onClick={processNextJob} disabled={!!jobBusy || !demo?.worker_queue.pending}>{jobBusy === "next" ? "领取中" : "执行下一项"}</button></header>{demo?.worker_queue.jobs.length ? demo.worker_queue.jobs.map((job) => <article key={job.job_id}><i className={job.status.toLowerCase()}/><div><strong>{job.skill}</strong><p>{job.agent_id} · {job.job_id}</p>{job.error && <small>{job.error}</small>}</div><aside><b>{job.status}</b><span>{job.attempt}/{job.max_attempts}</span>{job.status === "FAILED" && job.attempt < job.max_attempts && <button onClick={() => retryJob(job.job_id)} disabled={!!jobBusy}>{jobBusy === job.job_id ? "入队中" : "重试"}</button>}</aside></article>) : <p className="queue-empty">启动私人意图后，Manager 会把工作分派到持久队列。</p>}</div><div className="agent-registry-title"><span>AGENT REGISTRY</span><b>{demo?.agents.length ?? 0} REGISTERED</b></div><div className="runtime-list">{demo?.agents.map((agent, index) => <article key={agent.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{agent.name}</strong><p>{agent.role}</p></div><aside><i className={agent.status === "ACTIVE" ? "active" : ""}/><b>{agent.status}</b><small>{agent.events} EVENTS</small></aside></article>)}</div></section>}

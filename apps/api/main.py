@@ -7,10 +7,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from apps.api.service import DEFAULT_DB, DemoError, DemoService, ROOT
+from apps.api.identity import LocalIdentityRuntime
+from apps.api.service import DEFAULT_DB, DemoError, ROOT
 
 DB_PATH = Path(os.environ.get("AGENTREACH_PERSONAL_DB", DEFAULT_DB))
-service = DemoService(DB_PATH)
+service = LocalIdentityRuntime(DB_PATH)
 if os.environ.get("AGENTREACH_RESET_ON_START", "0") == "1":
     service.reset()
 app = FastAPI(
@@ -72,6 +73,15 @@ class RunRequest(BaseModel):
     run_id: str = Field(min_length=1, max_length=100)
 
 
+class IdentityCreateRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=40)
+    agent_name: str = Field(min_length=1, max_length=40)
+
+
+class IdentitySwitchRequest(BaseModel):
+    profile_id: str = Field(min_length=1, max_length=100)
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -96,6 +106,22 @@ def health():
 
 @app.get("/api/demo")
 def get_demo():
+    return service.snapshot()
+
+
+@app.get("/api/identities")
+def list_identities():
+    return service.identities()
+
+
+@app.post("/api/identities")
+def create_identity(payload: IdentityCreateRequest):
+    return call(service.create_identity, payload.display_name, payload.agent_name)
+
+
+@app.post("/api/identities/switch")
+def switch_identity(payload: IdentitySwitchRequest):
+    call(service.switch_identity, payload.profile_id)
     return service.snapshot()
 
 

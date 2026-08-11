@@ -1,4 +1,4 @@
-import type { DemoState, MemorySearchResult, NotificationResult } from "@/types/agent";
+import type { DemoState, IdentityRuntime, MemorySearchResult, NotificationResult } from "@/types/agent";
 
 const API = process.env.NEXT_PUBLIC_AGENTREACH_API ?? "http://127.0.0.1:8765";
 
@@ -86,4 +86,22 @@ export const notificationApi = {
   read: (notificationId: string) => notificationRequest("/api/notifications/read", { notification_id: notificationId }),
   readAll: () => notificationRequest("/api/notifications/read-all", {}),
   archive: (notificationId: string) => notificationRequest("/api/notifications/archive", { notification_id: notificationId }),
+};
+
+async function identityRequest(path: string, body?: unknown): Promise<IdentityRuntime | DemoState> {
+  const response = await fetch(`${API}${path}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: "no-store",
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail ?? "本地身份请求失败");
+  return data;
+}
+
+export const identityApi = {
+  list: () => identityRequest("/api/identities") as Promise<IdentityRuntime>,
+  create: (displayName: string, agentName: string) => identityRequest("/api/identities", { display_name: displayName, agent_name: agentName }) as Promise<IdentityRuntime>,
+  switch: (profileId: string) => identityRequest("/api/identities/switch", { profile_id: profileId }) as Promise<DemoState>,
 };

@@ -8,5 +8,6 @@ __pycache__/
 node_modules/
 *.tsbuildinfo
 data/*.db
+data/profiles/
 logs/*.log
 !.gitkeep

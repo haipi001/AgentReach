@@ -75,6 +75,22 @@ export type NotificationRecord = {
 
 export type NotificationResult = { unread: number; total: number; items: NotificationRecord[] };
 
+export type IdentityProfile = {
+  profile_id: string;
+  display_name: string;
+  agent_name: string;
+  created_at: string;
+  last_active_at: string;
+  active: boolean;
+};
+
+export type IdentityRuntime = {
+  session_id: string;
+  active_profile_id: string;
+  local_only: boolean;
+  profiles: IdentityProfile[];
+};
+
 export type DemoState = {
   stage: string;
   trace_id: string;
@@ -166,4 +182,5 @@ export type DemoState = {
     claim_mode: string;
   };
   notification_runtime: { unread: number; total: number; persistent: boolean };
+  identity_runtime?: IdentityRuntime;
 };

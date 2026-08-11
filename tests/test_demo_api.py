@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from apps.api import main as api_main
+from apps.api.identity import LocalIdentityRuntime
 from apps.api.service import DemoService
 
 app = api_main.app
@@ -140,3 +141,22 @@ def test_notification_inbox_http_lifecycle():
     notification_id = inbox["items"][0]["notification_id"]
     assert client.post("/api/notifications/read", json={"notification_id": notification_id}).json()["unread"] == 0
     assert client.post("/api/notifications/archive", json={"notification_id": notification_id}).json()["total"] == 0
+
+
+def test_identity_http_switches_to_isolated_workspace(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_main, "service", LocalIdentityRuntime(tmp_path / "identity-api.db"))
+    client = TestClient(app)
+    first = client.post("/api/runtime/start", json={"request": "first owner task"}).json()
+    first_profile = first["identity_runtime"]["active_profile_id"]
+
+    created = client.post("/api/identities", json={"display_name": "Second Owner", "agent_name": "NOVA"})
+    assert created.status_code == 200
+    second_profile = created.json()["active_profile_id"]
+    assert second_profile != first_profile
+    assert client.get("/api/demo").json()["human_request"] is None
+    client.post("/api/runtime/start", json={"request": "second owner task"})
+
+    restored = client.post("/api/identities/switch", json={"profile_id": first_profile})
+    assert restored.status_code == 200
+    assert restored.json()["human_request"] == "first owner task"
+    assert restored.json()["identity_runtime"]["active_profile_id"] == first_profile
