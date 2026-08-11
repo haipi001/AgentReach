@@ -11,8 +11,8 @@ export function ExperienceFrame({ children }: { children: ReactNode }) {
   const plane = resolveExperiencePlane(view, agentState);
 
   return <main className={`spatial-app view-${view}`} data-plane={plane}>
-    <nav><a href="#" className="brand"><span><em>AGENT</em><b>REACH</b></span></a><div className="experience-rail" aria-label="Experience plane">{EXPERIENCE_PLANES.map((item, index) => <span key={item.id} className={plane === item.id ? "active" : ""}>{index > 0 && <b>/</b>}{item.label}</span>)}</div><div className="nav-actions"><button className="nav-customize" onClick={() => openStudio(true)}>CUSTOMIZE</button><button className="nav-menu" aria-label="Menu"><i/><i/></button></div></nav>
+    <nav><a href="#" className="brand"><span><em>AGENT</em><b>REACH</b></span></a><div className="experience-rail" aria-label="体验阶段">{EXPERIENCE_PLANES.map((item, index) => <span key={item.id} className={plane === item.id ? "active" : ""}>{index > 0 && <b>/</b>}{item.label}</span>)}</div><div className="nav-actions"><button className="nav-customize" onClick={() => openStudio(true)}>自定义</button><button className="nav-menu" aria-label="菜单"><i/><i/></button></div></nav>
     {children}
-    <footer><span>HAIPI AGENT / ACTIVE</span><span>PLANE {plane.toUpperCase()}</span><span>BOUNDARY NORMAL</span></footer>
+    <footer><span>HAIPI 智能体 / 活跃</span><span>阶段 {EXPERIENCE_PLANES.find(item => item.id === plane)?.label}</span><span>边界正常</span></footer>
   </main>;
 }

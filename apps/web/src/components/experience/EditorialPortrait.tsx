@@ -17,7 +17,7 @@ export function EditorialPortrait({ cursorX, cursorY, scroll }: PortraitProps) {
   const maskX = useTransform([cursorX, scroll], ([pointer, progress]) => Number(pointer) * 4.1 + Number(progress) * 390);
   const maskRotate = useTransform(cursorY, [-8, 8], [-2.2, 2.2]);
 
-  return <figure className="editorial-photo" aria-label="Faceless virtual personal AI">
+  return <figure className="editorial-photo" aria-label="无面虚拟个人智能体">
     <motion.div className="portrait-image portrait-base" style={{ x: baseX, y: baseY }} />
     <motion.div className="portrait-image portrait-slice slice-upper" aria-hidden="true" style={{ x: upperX }} />
     <motion.div className="portrait-image portrait-slice slice-eye" aria-hidden="true" style={{ x: eyeX }} />
@@ -26,6 +26,6 @@ export function EditorialPortrait({ cursorX, cursorY, scroll }: PortraitProps) {
     <motion.div className="portrait-mask mask-secondary" aria-hidden="true" style={{ x: upperX }} />
     <motion.div className="portrait-signal signal-a" aria-hidden="true" style={{ x: eyeX }} />
     <motion.div className="portrait-signal signal-b" aria-hidden="true" style={{ x: mouthX }} />
-    <figcaption><b>SELF / 001</b><span>FACE PRIVATE · MASK OPTIONAL</span></figcaption>
+    <figcaption><b>自我 / 001</b><span>面容私有 · 面具可选</span></figcaption>
   </figure>;
 }

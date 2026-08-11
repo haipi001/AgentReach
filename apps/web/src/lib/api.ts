@@ -9,7 +9,7 @@ async function request(path: string, body?: unknown): Promise<DemoState> {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.detail ?? "Protocol request failed");
+  if (!response.ok) throw new Error(data.detail ?? "协议请求失败");
   return data;
 }
 

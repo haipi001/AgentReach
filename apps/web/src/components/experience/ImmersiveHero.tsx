@@ -38,16 +38,16 @@ export function ImmersiveHero() {
       </motion.div>
       <ParameterConstellation progress={scrollYProgress} />
       <div className="grain" aria-hidden="true" />
-      {view === "self" && <button className="mobile-customize" onClick={() => openStudio(true)}>CUSTOMIZE AI FORM</button>}
+      {view === "self" && <button className="mobile-customize" onClick={() => openStudio(true)}>自定义智能体形象</button>}
       <aside className="hero-status-card">
-        <small>TRUST STATE</small>
+        <small>信任状态</small>
         <div className="status-orbit" aria-hidden="true"><i/><i/></div>
         <i />
-        <dl><dt>AGENT</dt><dd>HAIPI</dd><dt>BOUNDARY</dt><dd>LOCAL</dd></dl>
+        <dl><dt>智能体</dt><dd>HAIPI</dd><dt>边界</dt><dd>本地</dd></dl>
       </aside>
-      <div className="hero-lock-label"><span>MOVE TO RECOMPOSE</span><b>DRAG / SCROLL</b></div>
-      <motion.div className="hero-caption" style={{ y: copyY, opacity: copyOpacity }}><span>MY AI</span><b>PRIVATE PRESENCE<br/>SINCE 2026</b></motion.div>
-      <div className="hero-scroll-label"><span>SCROLL</span><b>↓</b></div>
+      <div className="hero-lock-label"><span>移动指针重组形象</span><b>拖动 / 滚动</b></div>
+      <motion.div className="hero-caption" style={{ y: copyY, opacity: copyOpacity }}><span>我的智能体</span><b>私密存在<br/>始于 2026</b></motion.div>
+      <div className="hero-scroll-label"><span>向下滚动</span><b>↓</b></div>
       <motion.div className="global-scroll-progress" style={{ scaleY: scrollYProgress }} />
     </div>
   </section>;

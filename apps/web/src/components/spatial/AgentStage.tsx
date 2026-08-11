@@ -14,6 +14,7 @@ export function AgentStage() {
   const persona = useAgentStore((s) => s.persona);
   const avatarAsset = useAgentStore((s) => s.avatarAsset);
   const [compact, setCompact] = useState(false);
+  const stateLabel = { idle: "待机", thinking: "思考中", searching: "搜索中", waiting_approval: "等待批准", connected: "已连接" }[agentState];
   useEffect(() => {
     const query = window.matchMedia("(max-width: 900px), (max-aspect-ratio: 4/5)");
     const update = () => setCompact(query.matches);
@@ -21,7 +22,7 @@ export function AgentStage() {
     return () => query.removeEventListener("change", update);
   }, []);
   return <>
-    <div className={`canvas-shell state-${agentState} view-${view}`} aria-label={`AI avatar state ${agentState}`}>
+    <div className={`canvas-shell state-${agentState} view-${view}`} aria-label={`人工智能虚拟人状态：${stateLabel}`}>
       <Canvas key={compact ? "compact" : "wide"} shadows dpr={[1, 1.8]} gl={{ alpha: true, antialias: true }} camera={{ position: [0, compact ? 0 : .02, compact ? 9.4 : 9], fov: compact ? 32 : 30 }}>
         <ambientLight intensity={1.8} />
         <directionalLight position={[3.6, 5, 5]} intensity={4.2} color="#fffef2" castShadow />

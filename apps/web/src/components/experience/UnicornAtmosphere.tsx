@@ -29,14 +29,14 @@ export function UnicornAtmosphere() {
           const existing = document.querySelector<HTMLScriptElement>(`script[src="${SDK}"]`);
           if (existing) {
             existing.addEventListener("load", () => resolve(), { once: true });
-            existing.addEventListener("error", () => reject(new Error("Unicorn Studio failed to load")), { once: true });
+            existing.addEventListener("error", () => reject(new Error("互动背景加载失败")), { once: true });
             return;
           }
           const script = document.createElement("script");
           script.src = SDK;
           script.async = true;
           script.onload = () => resolve();
-          script.onerror = () => reject(new Error("Unicorn Studio failed to load"));
+          script.onerror = () => reject(new Error("互动背景加载失败"));
           document.head.appendChild(script);
         });
       }
@@ -49,8 +49,8 @@ export function UnicornAtmosphere() {
         fps: 30,
         lazyLoad: false,
         production: true,
-        altText: "Ambient interactive AI field",
-        ariaLabel: "Ambient interactive AI field",
+        altText: "环境式人工智能互动场",
+        ariaLabel: "环境式人工智能互动场",
         interactivity: { mouse: { disableMobile: true, disabled: false } },
       });
     };
