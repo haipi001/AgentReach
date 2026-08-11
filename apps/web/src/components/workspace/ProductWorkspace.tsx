@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { demoApi } from "@/lib/api";
 import { zh } from "@/lib/i18n";
@@ -15,6 +15,8 @@ const PHASES = [
   { id: "evidence", label: "EVIDENCE", stages: ["COMPLETED"] },
 ];
 
+const DEFAULT_REQUEST = "最近我想继续做 Personal Agent，有没有合适的人？";
+
 function stageIndex(stage: string) {
   const index = PHASES.findIndex((phase) => phase.stages.includes(stage));
   return index < 0 ? 0 : index;
@@ -27,11 +29,15 @@ export function ProductWorkspace() {
   const setView = useAgentStore((state) => state.setView);
   const setAgentState = useAgentStore((state) => state.setAgentState);
   const openStudio = useAgentStore((state) => state.setPersonaStudioOpen);
-  const [request, setRequest] = useState("最近我想继续做 Personal Agent，有没有合适的人？");
+  const [request, setRequest] = useState(DEFAULT_REQUEST);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const activeIndex = stageIndex(demo?.stage ?? "CREATED");
   const latestTrace = useMemo(() => [...(demo?.trace ?? [])].reverse().slice(0, 4), [demo?.trace]);
+
+  useEffect(() => {
+    setRequest(demo?.human_request || DEFAULT_REQUEST);
+  }, [demo?.runtime.run_id]);
 
   async function begin() {
     if (!request.trim() || busy) return;

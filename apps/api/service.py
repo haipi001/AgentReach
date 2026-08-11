@@ -155,7 +155,8 @@ class DemoService:
                     human_request TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    finished_at TEXT
+                    finished_at TEXT,
+                    state_payload TEXT
                 );
                 CREATE TABLE IF NOT EXISTS connector_registry (
                     connector_id TEXT PRIMARY KEY,
@@ -195,6 +196,9 @@ class DemoService:
                 );
                 """
             )
+            run_columns = {row["name"] for row in conn.execute("PRAGMA table_info(task_runs)").fetchall()}
+            if "state_payload" not in run_columns:
+                conn.execute("ALTER TABLE task_runs ADD COLUMN state_payload TEXT")
             conn.executemany(
                 """INSERT OR IGNORE INTO connector_registry
                 (connector_id, enabled, status, mode, capability, last_checked_at, details)
@@ -216,24 +220,25 @@ class DemoService:
 
     def _save_state(self, state: dict[str, Any]) -> None:
         state["updated_at"] = _iso(DEMO_NOW + timedelta(seconds=self._trace_count(state)))
+        serialized = json.dumps(state, ensure_ascii=False)
         with self._connect() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO demo_state(id, payload, updated_at) VALUES(1, ?, ?)",
-                (json.dumps(state, ensure_ascii=False), _iso(DEMO_NOW)),
+                (serialized, _iso(DEMO_NOW)),
             )
             conn.execute(
                 """INSERT INTO task_runs
-                (run_id, task_id, trace_id, status, stage, attempt, human_request, created_at, updated_at, finished_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (run_id, task_id, trace_id, status, stage, attempt, human_request, created_at, updated_at, finished_at, state_payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(run_id) DO UPDATE SET
                     status=excluded.status, stage=excluded.stage, attempt=excluded.attempt,
                     human_request=excluded.human_request, updated_at=excluded.updated_at,
-                    finished_at=excluded.finished_at""",
+                    finished_at=excluded.finished_at, state_payload=excluded.state_payload""",
                 (
                     state["run_id"], state["task_id"], state["trace_id"],
                     state["runtime_status"], state["stage"], state["attempt"],
                     state.get("human_request"), state["created_at"], state["updated_at"],
-                    state.get("finished_at"),
+                    state.get("finished_at"), serialized,
                 ),
             )
 
@@ -298,11 +303,12 @@ class DemoService:
         validator = Draft202012Validator(self._schema(name), format_checker=FormatChecker())
         return [error.message for error in sorted(validator.iter_errors(payload), key=lambda e: list(e.path))]
 
-    def reset(self) -> dict[str, Any]:
+    def reset(self, preserve_current: bool = False) -> dict[str, Any]:
         previous = self._get_state()
         if previous and previous.get("runtime_status") not in {"COMPLETED", "CANCELLED", "FAILED", "SUPERSEDED"}:
-            previous["runtime_status"] = "SUPERSEDED"
-            previous["finished_at"] = _iso(DEMO_NOW)
+            previous["runtime_status"] = "PAUSED" if preserve_current else "SUPERSEDED"
+            if not preserve_current:
+                previous["finished_at"] = _iso(DEMO_NOW)
             self._save_state(previous)
         state = {
             "run_id": f"run-{uuid4().hex[:8]}",
@@ -390,22 +396,51 @@ class DemoService:
             raise DemoError("只有已取消或失败的任务可以重试。")
         request = previous.get("human_request", "")
         attempt = int(previous.get("attempt", 1)) + 1
-        result = self.reset()
+        self.reset()
         state = self._get_state()
         assert state is not None
         state["attempt"] = attempt
         state["retried_from"] = previous["run_id"]
         self._save_state(state)
         if request:
-            self.structure_intent(request)
-            return self.discover()
+            self.enqueue_job("intent-worker", "intent-structuring", {"request": request})
+            first = self.process_next_job()
+            if first["worker_queue"]["jobs"][-1]["status"] != "SUCCEEDED":
+                return first
+            self.enqueue_job("discovery-worker", "candidate-discovery")
+            return self.process_next_job()
         return self.snapshot()
 
     def list_runs(self) -> dict[str, Any]:
         with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM task_runs ORDER BY rowid DESC LIMIT 30").fetchall()
-        items = [dict(row) for row in rows]
+            rows = conn.execute(
+                """SELECT run_id, task_id, trace_id, status, stage, attempt, human_request,
+                created_at, updated_at, finished_at, state_payload IS NOT NULL AS recoverable
+                FROM task_runs ORDER BY rowid DESC LIMIT 30"""
+            ).fetchall()
+        items = [dict(row) | {"recoverable": bool(row["recoverable"])} for row in rows]
         return {"total": len(items), "items": items}
+
+    def switch_run(self, run_id: str) -> dict[str, Any]:
+        current = self._get_state()
+        if current is not None and current["run_id"] == run_id:
+            return self.snapshot()
+        with self._connect() as conn:
+            row = conn.execute("SELECT status, state_payload FROM task_runs WHERE run_id = ?", (run_id,)).fetchone()
+        if row is None or not row["state_payload"]:
+            raise DemoError("该 Run 没有可恢复的状态快照。")
+        if current is not None and current.get("runtime_status") == "RUNNING":
+            current["runtime_status"] = "PAUSED"
+            self._save_state(current)
+        target = json.loads(row["state_payload"])
+        if target.get("runtime_status") == "PAUSED":
+            target["runtime_status"] = "RUNNING"
+        self._save_state(target)
+        self._event(
+            target, "personal-manager", "task-orchestration", "run.switched", "RESTORED",
+            "用户切换到持久化任务快照。", {"run_id": run_id, "stage": target["stage"]},
+        )
+        return self.snapshot()
 
     def enqueue_job(self, agent_id: str, skill: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         state = self._get_state()
@@ -528,7 +563,7 @@ class DemoService:
         return self.list_notifications()
 
     def start_task(self, request: str) -> dict[str, Any]:
-        self.reset()
+        self.reset(preserve_current=True)
         self.enqueue_job("intent-worker", "intent-structuring", {"request": request})
         first = self.process_next_job()
         first_job = first["worker_queue"]["jobs"][-1]

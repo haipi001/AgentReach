@@ -152,7 +152,79 @@ def test_durable_run_can_pause_resume_cancel_and_retry(service: DemoService):
     assert retried["stage"] == "CANDIDATES_FOUND"
     assert retried["runtime"]["attempt"] == 2
     assert retried["runtime"]["run_id"] != first_run
+    assert retried["worker_queue"]["succeeded"] == 2
+    assert [job["skill"] for job in retried["worker_queue"]["jobs"]] == ["intent-structuring", "candidate-discovery"]
     assert any(run["run_id"] == first_run and run["status"] == "CANCELLED" for run in retried["runtime"]["history"])
+
+
+def test_multi_task_workspaces_switch_with_isolated_state(service: DemoService):
+    first = service.start_task("寻找第一位身份协议合作者")
+    first_run = first["runtime"]["run_id"]
+    first = service.select_candidate_queued("alice")
+    assert first["stage"] == "WAITING_USER_APPROVAL"
+
+    second = service.start_task("寻找第二位隐私工程合作者")
+    second_run = second["runtime"]["run_id"]
+    assert second_run != first_run
+    assert second["human_request"] == "寻找第二位隐私工程合作者"
+    assert second["selected_candidate"] is None
+    first_history = next(run for run in second["runtime"]["history"] if run["run_id"] == first_run)
+    assert first_history["status"] == "PAUSED"
+    assert first_history["recoverable"] is True
+
+    restored_first = service.switch_run(first_run)
+    assert restored_first["runtime"]["run_id"] == first_run
+    assert restored_first["runtime"]["status"] == "RUNNING"
+    assert restored_first["stage"] == "WAITING_USER_APPROVAL"
+    assert restored_first["human_request"] == "寻找第一位身份协议合作者"
+    assert restored_first["selected_candidate"]["id"] == "alice"
+    second_history = next(run for run in restored_first["runtime"]["history"] if run["run_id"] == second_run)
+    assert second_history["status"] == "PAUSED"
+
+    restored_second = service.switch_run(second_run)
+    assert restored_second["runtime"]["run_id"] == second_run
+    assert restored_second["stage"] == "CANDIDATES_FOUND"
+    assert restored_second["selected_candidate"] is None
+    assert restored_second["human_request"] == "寻找第二位隐私工程合作者"
+
+
+def test_completed_workspace_can_be_inspected_without_reexecution(service: DemoService):
+    first = service.start_task("完成并保留证据")
+    service.select_candidate_queued(first["candidates"][0]["id"])
+    service.approve_introduction_queued()
+    service.peer_decision_queued(True)
+    completed = service.approve_commitment_queued()
+    completed_run = completed["runtime"]["run_id"]
+    receipt_count = completed["connector_runtime"]["receipts"]
+    evidence = completed["evidence"]
+
+    active = service.start_task("另一个活动任务")
+    active_run = active["runtime"]["run_id"]
+    inspected = service.switch_run(completed_run)
+    assert inspected["runtime"]["status"] == "COMPLETED"
+    assert inspected["evidence"] == evidence
+    assert inspected["connector_runtime"]["receipts"] == receipt_count
+
+    resumed = service.switch_run(active_run)
+    assert resumed["runtime"]["status"] == "RUNNING"
+    assert resumed["human_request"] == "另一个活动任务"
+
+
+def test_workspace_snapshots_survive_service_restart(tmp_path: Path):
+    db_path = tmp_path / "multi-task.db"
+    first_service = DemoService(db_path)
+    first = first_service.start_task("重启前任务")
+    first_run = first["runtime"]["run_id"]
+    first_service.select_candidate_queued("carol")
+    second = first_service.start_task("重启后的当前任务")
+    second_run = second["runtime"]["run_id"]
+
+    recovered_service = DemoService(db_path)
+    restored = recovered_service.switch_run(first_run)
+    assert restored["selected_candidate"]["id"] == "carol"
+    assert restored["stage"] == "WAITING_USER_APPROVAL"
+    assert restored["runtime"]["status"] == "RUNNING"
+    assert next(run for run in restored["runtime"]["history"] if run["run_id"] == second_run)["status"] == "PAUSED"
 
 
 def test_paused_run_survives_service_restart(tmp_path: Path):

@@ -142,6 +142,7 @@ export type DemoState = {
       created_at: string;
       updated_at: string;
       finished_at: string | null;
+      recoverable: boolean;
     }[];
   };
   worker_queue: {

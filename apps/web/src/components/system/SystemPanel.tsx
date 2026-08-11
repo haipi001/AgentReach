@@ -22,6 +22,7 @@ export function SystemPanel() {
   const setOpen = useAgentStore((state) => state.setSystemPanelOpen);
   const demo = useAgentStore((state) => state.demo);
   const setDemo = useAgentStore((state) => state.setDemo);
+  const setView = useAgentStore((state) => state.setView);
   const [tab, setTab] = useState<SystemTab>("runs");
   const [testing, setTesting] = useState(false);
   const [memoryQuery, setMemoryQuery] = useState("");
@@ -76,6 +77,18 @@ export function SystemPanel() {
     } finally { setRuntimeBusy(false); }
   }
 
+  async function switchRun(runId: string) {
+    if (runtimeBusy) return;
+    setRuntimeBusy(true);
+    try {
+      const next = await demoApi.switchRun(runId);
+      setDemo(next);
+      if (["WAITING_USER_APPROVAL", "WAITING_PEER_APPROVAL", "COMMITMENT_PROPOSED", "WAITING_ACTION_EXECUTION", "WAITING_VERIFICATION"].includes(next.stage)) setView("capsule");
+      else if (["COMPLETED", "PEER_REJECTED", "FAILED"].includes(next.stage)) setView("connected");
+      else setView("self");
+    } finally { setRuntimeBusy(false); }
+  }
+
   async function checkConnector(connectorId: string) {
     if (connectorBusy) return;
     setConnectorBusy(connectorId);
@@ -120,7 +133,7 @@ export function SystemPanel() {
       <nav aria-label="系统控制面分类">{TAB_LABELS.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => chooseTab(item.id)}>{item.label}</button>)}</nav>
 
       <div className="system-panel-body">
-        {tab === "runs" && <section><div className="system-panel-heading"><span>DURABLE TASK RUNTIME</span><b>{demo?.runtime.status ?? "LOADING"}</b></div>{demo?.runtime && <><div className="run-hero"><div><span>CURRENT RUN</span><strong>{demo.runtime.run_id}</strong><p>{demo.stage} · ATTEMPT {demo.runtime.attempt}</p></div><i className={demo.runtime.status.toLowerCase()}>{demo.runtime.status}</i></div><div className="run-controls"><button onClick={() => controlRun("pause")} disabled={runtimeBusy || !demo.runtime.controls.can_pause}>暂停</button><button onClick={() => controlRun("resume")} disabled={runtimeBusy || !demo.runtime.controls.can_resume}>恢复</button><button onClick={() => controlRun("cancel")} disabled={runtimeBusy || !demo.runtime.controls.can_cancel}>{confirmCancel ? "确认取消" : "取消"}</button><button onClick={() => controlRun("retry")} disabled={runtimeBusy || !demo.runtime.controls.can_retry}>重试</button></div><div className="run-history"><h3>持久运行记录 <b>{demo.runtime.history.length}</b></h3>{demo.runtime.history.map((run) => <article key={run.run_id} className={run.run_id === demo.runtime.run_id ? "current" : ""}><span>{run.status}</span><div><strong>{run.run_id}</strong><p>{run.stage} · ATTEMPT {run.attempt}</p></div><small>{run.trace_id}</small></article>)}</div></>}</section>}
+        {tab === "runs" && <section><div className="system-panel-heading"><span>MULTI-TASK RUNTIME</span><b>{demo?.runtime.status ?? "LOADING"}</b></div>{demo?.runtime && <><div className="run-hero"><div><span>CURRENT WORKSPACE</span><strong>{demo.human_request || "尚未输入任务"}</strong><p>{demo.stage} · ATTEMPT {demo.runtime.attempt} · {demo.runtime.run_id}</p></div><i className={demo.runtime.status.toLowerCase()}>{demo.runtime.status}</i></div><div className="run-controls"><button onClick={() => controlRun("pause")} disabled={runtimeBusy || !demo.runtime.controls.can_pause}>暂停</button><button onClick={() => controlRun("resume")} disabled={runtimeBusy || !demo.runtime.controls.can_resume}>恢复</button><button onClick={() => controlRun("cancel")} disabled={runtimeBusy || !demo.runtime.controls.can_cancel}>{confirmCancel ? "确认取消" : "取消"}</button><button onClick={() => controlRun("retry")} disabled={runtimeBusy || !demo.runtime.controls.can_retry}>重试</button></div><div className="run-history"><h3>任务工作区 <b>{demo.runtime.history.length}</b></h3>{demo.runtime.history.map((run) => { const terminal = ["COMPLETED", "CANCELLED", "FAILED", "SUPERSEDED"].includes(run.status); return <article key={run.run_id} className={run.run_id === demo.runtime.run_id ? "current" : ""}><span>{run.status}</span><div><strong>{run.human_request || "未命名任务"}</strong><p>{run.stage} · ATTEMPT {run.attempt}</p></div><small>{run.run_id}</small>{run.run_id !== demo.runtime.run_id && <button onClick={() => switchRun(run.run_id)} disabled={runtimeBusy || !run.recoverable}>{terminal ? "查看" : "切换"}</button>}</article>; })}</div></>}</section>}
 
         {tab === "agents" && <section><div className="system-panel-heading"><span>WORKER RUNTIME</span><b>{demo?.worker_queue.durable ? "DURABLE QUEUE" : "EPHEMERAL"}</b></div><div className="queue-summary"><div><span>PENDING</span><strong>{demo?.worker_queue.pending ?? 0}</strong></div><div><span>RUNNING</span><strong>{demo?.worker_queue.running ?? 0}</strong></div><div><span>FAILED</span><strong>{demo?.worker_queue.failed ?? 0}</strong></div><div><span>SUCCEEDED</span><strong>{demo?.worker_queue.succeeded ?? 0}</strong></div></div><div className="worker-jobs"><header><span>JOB QUEUE / {demo?.worker_queue.claim_mode ?? "OFFLINE"}</span><button onClick={processNextJob} disabled={!!jobBusy || !demo?.worker_queue.pending}>{jobBusy === "next" ? "领取中" : "执行下一项"}</button></header>{demo?.worker_queue.jobs.length ? demo.worker_queue.jobs.map((job) => <article key={job.job_id}><i className={job.status.toLowerCase()}/><div><strong>{job.skill}</strong><p>{job.agent_id} · {job.job_id}</p>{job.error && <small>{job.error}</small>}</div><aside><b>{job.status}</b><span>{job.attempt}/{job.max_attempts}</span>{job.status === "FAILED" && job.attempt < job.max_attempts && <button onClick={() => retryJob(job.job_id)} disabled={!!jobBusy}>{jobBusy === job.job_id ? "入队中" : "重试"}</button>}</aside></article>) : <p className="queue-empty">启动私人意图后，Manager 会把工作分派到持久队列。</p>}</div><div className="agent-registry-title"><span>AGENT REGISTRY</span><b>{demo?.agents.length ?? 0} REGISTERED</b></div><div className="runtime-list">{demo?.agents.map((agent, index) => <article key={agent.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{agent.name}</strong><p>{agent.role}</p></div><aside><i className={agent.status === "ACTIVE" ? "active" : ""}/><b>{agent.status}</b><small>{agent.events} EVENTS</small></aside></article>)}</div></section>}
 

@@ -63,6 +63,10 @@ class NotificationRequest(BaseModel):
     notification_id: str = Field(min_length=1, max_length=100)
 
 
+class RunRequest(BaseModel):
+    run_id: str = Field(min_length=1, max_length=100)
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -168,6 +172,11 @@ def retry_worker_job(payload: WorkerJobRequest):
 @app.get("/api/runtime/runs")
 def list_runs():
     return service.list_runs()
+
+
+@app.post("/api/runtime/switch")
+def switch_run(payload: RunRequest):
+    return call(service.switch_run, payload.run_id)
 
 
 @app.get("/api/notifications")

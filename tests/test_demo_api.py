@@ -102,6 +102,25 @@ def test_runtime_start_uses_durable_worker_queue():
     assert {job["agent_id"] for job in state["worker_queue"]["jobs"]} == {"intent-worker", "discovery-worker"}
 
 
+def test_runtime_switch_endpoint_restores_an_isolated_workspace():
+    client = TestClient(app)
+    first = client.post("/api/runtime/start", json={"request": "first isolated task"}).json()
+    first_run = first["runtime"]["run_id"]
+    client.post("/api/demo/select", json={"candidate_id": "alice"})
+    second = client.post("/api/runtime/start", json={"request": "second isolated task"}).json()
+    second_run = second["runtime"]["run_id"]
+
+    restored = client.post("/api/runtime/switch", json={"run_id": first_run})
+    assert restored.status_code == 200
+    assert restored.json()["stage"] == "WAITING_USER_APPROVAL"
+    assert restored.json()["selected_candidate"]["id"] == "alice"
+    assert restored.json()["runtime"]["run_id"] == first_run
+    assert next(run for run in restored.json()["runtime"]["history"] if run["run_id"] == second_run)["status"] == "PAUSED"
+
+    missing = client.post("/api/runtime/switch", json={"run_id": "run-missing"})
+    assert missing.status_code == 409
+
+
 def test_notification_inbox_http_lifecycle():
     client = TestClient(app)
     state = client.post("/api/runtime/start", json={"request": "notification test"}).json()

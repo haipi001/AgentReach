@@ -44,6 +44,7 @@ export const demoApi = {
   resumeRun: () => request("/api/runtime/resume"),
   cancelRun: () => request("/api/runtime/cancel"),
   retryRun: () => request("/api/runtime/retry"),
+  switchRun: (runId: string) => request("/api/runtime/switch", { run_id: runId }),
   processNextJob: () => request("/api/runtime/jobs/process-next"),
   retryJob: (jobId: string) => request("/api/runtime/jobs/retry", { job_id: jobId }),
   checkConnector: (connectorId: string) => request("/api/connectors/check", { connector_id: connectorId }),
