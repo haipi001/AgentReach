@@ -34,7 +34,7 @@ export function CapabilityAtlas() {
     <div ref={track} className="atlas-horizontal-track">
       <div className="atlas-sticky">
         <div className="atlas-title-rail"><span>SYSTEM MAP</span><b>01—05</b></div>
-        <figure className="atlas-body" aria-hidden="true"><div className="atlas-wire-head"><i/><i/><i/><b/></div><figcaption>SELF / LOCAL HEAD</figcaption></figure>
+        <figure className="atlas-body" aria-hidden="true"><div className="atlas-photo-head"><i/><i/><i/></div><figcaption>SELF / LOCAL HEAD</figcaption></figure>
         <motion.div ref={systems} className="atlas-systems" style={reduceMotion ? undefined : { x }}>{SYSTEMS.map((system) => <motion.article key={system.index} className="atlas-system">
         <div className="system-meta"><b>{system.index}</b><span>{system.zone}</span><i>{system.plane}</i></div>
         <h3>{system.title}</h3><p>{system.copy}</p>

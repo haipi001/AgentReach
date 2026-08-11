@@ -2,7 +2,9 @@
 
 import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
 import { useRef, type MouseEvent } from "react";
-import { AgentStage } from "@/components/spatial/AgentStage";
+import { EditorialPortrait } from "./EditorialPortrait";
+import { ParameterConstellation } from "./ParameterConstellation";
+import { UnicornAtmosphere } from "./UnicornAtmosphere";
 import { useAgentStore } from "@/stores/agent-store";
 
 export function ImmersiveHero() {
@@ -15,8 +17,8 @@ export function ImmersiveHero() {
   const x = useSpring(pointerX, { stiffness: 90, damping: 24 });
   const y = useSpring(pointerY, { stiffness: 90, damping: 24 });
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end start"] });
-  const presenceScale = useTransform(scrollYProgress, [0, .72, 1], [1, 1.08, .82]);
-  const presenceY = useTransform(scrollYProgress, [0, .72, 1], [0, -18, 120]);
+  const presenceScale = useTransform(scrollYProgress, [0, .62, 1], [1, 1.035, .88]);
+  const presenceY = useTransform(scrollYProgress, [0, .62, 1], [0, -10, 88]);
   const copyY = useTransform(scrollYProgress, [0, 1], [0, -110]);
   const copyOpacity = useTransform(scrollYProgress, [0, .72, 1], [1, .8, 0]);
 
@@ -29,10 +31,12 @@ export function ImmersiveHero() {
 
   return <section ref={track} className="hero-track" onMouseMove={move} onMouseLeave={() => { pointerX.set(0); pointerY.set(0); }}>
     <div className="hero-sticky">
+      <UnicornAtmosphere />
       <div className="hero-monogram" aria-hidden="true">AR</div>
       <motion.div className="hero-presence-stage" style={{ x, y: useTransform([y, presenceY], ([a, b]) => Number(a) + Number(b)), scale: presenceScale }}>
-        <AgentStage />
+        <EditorialPortrait cursorX={x} cursorY={y} scroll={scrollYProgress} />
       </motion.div>
+      <ParameterConstellation progress={scrollYProgress} />
       <div className="grain" aria-hidden="true" />
       {view === "self" && <button className="mobile-customize" onClick={() => openStudio(true)}>CUSTOMIZE AI FORM</button>}
       <aside className="hero-status-card">
