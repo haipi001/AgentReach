@@ -39,6 +39,14 @@ class PeerDecisionRequest(BaseModel):
     accepted: bool
 
 
+class MemorySearchRequest(BaseModel):
+    query: str = Field(default="", max_length=200)
+
+
+class MemoryForgetRequest(BaseModel):
+    memory_id: str = Field(min_length=1, max_length=100)
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -104,3 +112,13 @@ def approve_commitment():
 @app.post("/api/demo/privacy-attack")
 def privacy_attack():
     return call(service.deny_privacy_request)
+
+
+@app.post("/api/memory/search")
+def search_memory(payload: MemorySearchRequest):
+    return call(service.search_memories, payload.query)
+
+
+@app.post("/api/memory/forget")
+def forget_memory(payload: MemoryForgetRequest):
+    return call(service.forget_memory, payload.memory_id)

@@ -220,7 +220,6 @@ class DemoService:
         with self._connect() as conn:
             conn.execute("DELETE FROM audit_events")
             conn.execute("DELETE FROM mailbox_envelopes")
-            conn.execute("DELETE FROM memory_records")
             conn.execute("DELETE FROM action_receipts")
         self._save_state(state)
         self._event(
@@ -673,6 +672,60 @@ class DemoService:
         )
         return self.snapshot()
 
+    def search_memories(self, query: str = "") -> dict[str, Any]:
+        normalized = query.strip().lower()
+        terms = [term for term in normalized.replace("/", " ").split() if term]
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM memory_records ORDER BY created_at DESC"
+            ).fetchall()
+        items = []
+        for row in rows:
+            haystack = f"{row['kind']} {row['summary']} {row['trace_id']}".lower()
+            score = sum(haystack.count(term) for term in terms) if terms else 1
+            if terms and score == 0:
+                continue
+            items.append(
+                {
+                    "memory_id": row["memory_id"],
+                    "trace_id": row["trace_id"],
+                    "kind": row["kind"],
+                    "summary": row["summary"],
+                    "evidence": json.loads(row["evidence"]),
+                    "created_at": row["created_at"],
+                    "score": score,
+                    "verified": True,
+                }
+            )
+        items.sort(key=lambda item: (item["score"], item["created_at"]), reverse=True)
+        return {"query": query, "total": len(items), "items": items}
+
+    def forget_memory(self, memory_id: str) -> dict[str, Any]:
+        state = self._get_state()
+        if state is None:
+            raise DemoError("Demo 尚未初始化。")
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT memory_id FROM memory_records WHERE memory_id = ?", (memory_id,)
+            ).fetchone()
+            if row is None:
+                raise DemoError("Memory 不存在或已经被遗忘。")
+            conn.execute("DELETE FROM memory_records WHERE memory_id = ?", (memory_id,))
+        state["memory_updates"] = [
+            item for item in state["memory_updates"] if item["memory_id"] != memory_id
+        ]
+        self._save_state(state)
+        self._event(
+            state,
+            "personal-manager",
+            "experience-memory",
+            "memory.forgotten",
+            "ALLOW_LOCAL_OWNER",
+            "用户在本地 Memory Vault 中明确遗忘一条已验证经验。",
+            {"memory_id": memory_id, "scope": "local"},
+        )
+        return self.search_memories()
+
     def _trace(self, state: dict[str, Any]) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -732,6 +785,7 @@ class DemoService:
             "Executor and Verifier are separated",
         ]
         with self._connect() as conn:
+            memory_count = conn.execute("SELECT COUNT(*) FROM memory_records").fetchone()[0]
             result["connector_runtime"] = {
                 "receipts": conn.execute("SELECT COUNT(*) FROM action_receipts WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],
                 "mailbox_envelopes": conn.execute("SELECT COUNT(*) FROM mailbox_envelopes WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],
@@ -740,5 +794,11 @@ class DemoService:
                     {"id": "github-local-sandbox/v1", "status": "HEALTHY", "mode": "LOCAL", "write_scope": "repo:AgentReach:file:docs/vision.md"},
                     {"id": "agent-mailbox/v1", "status": "HEALTHY", "mode": "LOCAL", "write_scope": "inbox:selected-peer:send"},
                 ],
+            }
+            result["memory_runtime"] = {
+                "records": memory_count,
+                "verified_only": True,
+                "storage": "LOCAL_SQLITE",
+                "survives_task_reset": True,
             }
         return result

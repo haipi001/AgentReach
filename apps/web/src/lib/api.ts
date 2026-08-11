@@ -1,4 +1,4 @@
-import type { DemoState } from "@/types/agent";
+import type { DemoState, MemorySearchResult } from "@/types/agent";
 
 const API = process.env.NEXT_PUBLIC_AGENTREACH_API ?? "http://127.0.0.1:8765";
 
@@ -39,4 +39,20 @@ export const demoApi = {
   peerDecision: (accepted: boolean) => request("/api/demo/peer-decision", { accepted }),
   approveCommitment: () => request("/api/demo/approve-commitment"),
   privacyAttack: () => request("/api/demo/privacy-attack"),
+};
+
+async function memoryRequest(path: string, body: unknown): Promise<MemorySearchResult> {
+  const response = await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail ?? "Memory 请求失败");
+  return data;
+}
+
+export const memoryApi = {
+  search: (query = "") => memoryRequest("/api/memory/search", { query }),
+  forget: (memoryId: string) => memoryRequest("/api/memory/forget", { memory_id: memoryId }),
 };

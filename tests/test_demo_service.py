@@ -108,3 +108,24 @@ def test_reset_removes_previous_trace_and_state(service: DemoService):
     assert state["trace_id"] != previous_trace
     assert state["stage"] == "CREATED"
     assert len(state["trace"]) == 1
+
+
+def test_verified_memory_survives_task_reset_and_can_be_forgotten(service: DemoService):
+    state = advance_to_candidates(service)
+    service.select_candidate(state["candidates"][0]["id"])
+    service.approve_introduction()
+    service.peer_decision(True)
+    completed = service.approve_and_verify_commitment()
+    memory_id = completed["memory_updates"][0]["memory_id"]
+
+    reset_state = service.reset()
+    assert reset_state["memory_runtime"]["records"] == 1
+    assert reset_state["memory_runtime"]["survives_task_reset"] is True
+    results = service.search_memories("AgentReach")
+    assert results["total"] == 1
+    assert results["items"][0]["memory_id"] == memory_id
+    assert results["items"][0]["verified"] is True
+
+    forgotten = service.forget_memory(memory_id)
+    assert forgotten["total"] == 0
+    assert service.snapshot()["trace"][-1]["event_type"] == "memory.forgotten"

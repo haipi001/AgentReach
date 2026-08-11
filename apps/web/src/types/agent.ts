@@ -44,6 +44,23 @@ export type TraceEvent = {
   summary: string;
 };
 
+export type MemoryRecord = {
+  memory_id: string;
+  trace_id: string;
+  kind: string;
+  summary: string;
+  evidence: { type: string; label: string; verified: boolean }[];
+  created_at: string;
+  score: number;
+  verified: boolean;
+};
+
+export type MemorySearchResult = {
+  query: string;
+  total: number;
+  items: MemoryRecord[];
+};
+
 export type DemoState = {
   stage: string;
   trace_id: string;
@@ -73,4 +90,10 @@ export type DemoState = {
   privacy_invariants: string[];
   stage_index: number;
   stage_total: number;
+  memory_runtime: {
+    records: number;
+    verified_only: boolean;
+    storage: string;
+    survives_task_reset: boolean;
+  };
 };

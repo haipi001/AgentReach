@@ -34,3 +34,12 @@ def test_http_invalid_transition_is_conflict():
     response = client.post("/api/demo/discover")
     assert response.status_code == 409
     assert "不能执行" in response.json()["detail"]
+
+
+def test_memory_search_endpoint_returns_verified_records():
+    client = TestClient(app)
+    response = client.post("/api/memory/search", json={"query": ""})
+    assert response.status_code == 200
+    payload = response.json()
+    assert "total" in payload
+    assert all(item["verified"] for item in payload["items"])
