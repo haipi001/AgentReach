@@ -130,4 +130,23 @@ export type DemoState = {
       finished_at: string | null;
     }[];
   };
+  worker_queue: {
+    jobs: {
+      job_id: string;
+      agent_id: string;
+      skill: string;
+      status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+      attempt: number;
+      max_attempts: number;
+      error: string | null;
+      created_at: string;
+      updated_at: string;
+    }[];
+    pending: number;
+    running: number;
+    failed: number;
+    succeeded: number;
+    durable: boolean;
+    claim_mode: string;
+  };
 };

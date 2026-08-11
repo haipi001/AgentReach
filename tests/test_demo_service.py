@@ -186,3 +186,43 @@ def test_connector_registry_health_toggle_and_revocation_gate(service: DemoServi
     disabled = service.set_connector_enabled("agent-mailbox/v1", False)
     mailbox = next(item for item in disabled["connector_runtime"]["connectors"] if item["id"] == "agent-mailbox/v1")
     assert mailbox["status"] == "DISABLED"
+
+
+def test_worker_queue_drives_task_start_with_persistent_job_history(service: DemoService):
+    state = service.start_task("find a queued collaborator")
+    assert state["stage"] == "CANDIDATES_FOUND"
+    assert state["worker_queue"]["durable"] is True
+    assert state["worker_queue"]["claim_mode"] == "SQLITE_IMMEDIATE"
+    assert state["worker_queue"]["succeeded"] == 2
+    assert [job["skill"] for job in state["worker_queue"]["jobs"]] == ["intent-structuring", "candidate-discovery"]
+    assert all(job["attempt"] == 1 for job in state["worker_queue"]["jobs"])
+    assert sum(1 for event in state["trace"] if event["event_type"] == "job.succeeded") == 2
+
+
+def test_failed_worker_job_can_be_requeued_and_retried(service: DemoService):
+    queued = service.enqueue_job("discovery-worker", "candidate-discovery")
+    job_id = queued["worker_queue"]["jobs"][0]["job_id"]
+    failed = service.process_next_job()
+    assert failed["worker_queue"]["failed"] == 1
+    assert failed["worker_queue"]["jobs"][0]["attempt"] == 1
+
+    service.structure_intent("now discovery is valid")
+    pending = service.retry_job(job_id)
+    assert pending["worker_queue"]["pending"] == 1
+    succeeded = service.process_next_job()
+    assert succeeded["stage"] == "CANDIDATES_FOUND"
+    assert succeeded["worker_queue"]["jobs"][0]["status"] == "SUCCEEDED"
+    assert succeeded["worker_queue"]["jobs"][0]["attempt"] == 2
+
+
+def test_interrupted_worker_job_is_recovered_after_restart(tmp_path: Path):
+    db_path = tmp_path / "queue.db"
+    first = DemoService(db_path)
+    queued = first.enqueue_job("intent-worker", "intent-structuring", {"request": "recover me"})
+    job_id = queued["worker_queue"]["jobs"][0]["job_id"]
+    with first._connect() as conn:
+        conn.execute("UPDATE worker_jobs SET status = 'RUNNING' WHERE job_id = ?", (job_id,))
+
+    recovered = DemoService(db_path).snapshot()
+    assert recovered["worker_queue"]["pending"] == 1
+    assert recovered["worker_queue"]["jobs"][0]["error"] == "recovered_after_restart"

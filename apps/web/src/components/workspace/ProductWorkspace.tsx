@@ -37,10 +37,8 @@ export function ProductWorkspace() {
     if (!request.trim() || busy) return;
     setBusy(true); setError(""); setAgentState("thinking");
     try {
-      await demoApi.reset();
-      await demoApi.intent(request.trim());
       setAgentState("searching");
-      setDemo(await demoApi.discover());
+      setDemo(await demoApi.startTask(request.trim()));
       setAgentState("idle");
     } catch (reason) {
       setAgentState("idle");

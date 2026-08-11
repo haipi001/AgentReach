@@ -32,6 +32,7 @@ export function SystemPanel() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [connectorBusy, setConnectorBusy] = useState<string | null>(null);
   const [confirmConnector, setConfirmConnector] = useState<string | null>(null);
+  const [jobBusy, setJobBusy] = useState<string | null>(null);
 
   async function testBoundary() {
     if (testing) return;
@@ -98,6 +99,20 @@ export function SystemPanel() {
     finally { setConnectorBusy(null); }
   }
 
+  async function processNextJob() {
+    if (jobBusy) return;
+    setJobBusy("next");
+    try { setDemo(await demoApi.processNextJob()); }
+    finally { setJobBusy(null); }
+  }
+
+  async function retryJob(jobId: string) {
+    if (jobBusy) return;
+    setJobBusy(jobId);
+    try { setDemo(await demoApi.retryJob(jobId)); }
+    finally { setJobBusy(null); }
+  }
+
   return <AnimatePresence>{open && <>
     <motion.button className="system-scrim" aria-label="关闭系统控制面" onClick={() => setOpen(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}/>
     <motion.aside className="system-panel" aria-label="AgentReach 系统控制面" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 260, damping: 30 }}>
@@ -107,7 +122,7 @@ export function SystemPanel() {
       <div className="system-panel-body">
         {tab === "runs" && <section><div className="system-panel-heading"><span>DURABLE TASK RUNTIME</span><b>{demo?.runtime.status ?? "LOADING"}</b></div>{demo?.runtime && <><div className="run-hero"><div><span>CURRENT RUN</span><strong>{demo.runtime.run_id}</strong><p>{demo.stage} · ATTEMPT {demo.runtime.attempt}</p></div><i className={demo.runtime.status.toLowerCase()}>{demo.runtime.status}</i></div><div className="run-controls"><button onClick={() => controlRun("pause")} disabled={runtimeBusy || !demo.runtime.controls.can_pause}>暂停</button><button onClick={() => controlRun("resume")} disabled={runtimeBusy || !demo.runtime.controls.can_resume}>恢复</button><button onClick={() => controlRun("cancel")} disabled={runtimeBusy || !demo.runtime.controls.can_cancel}>{confirmCancel ? "确认取消" : "取消"}</button><button onClick={() => controlRun("retry")} disabled={runtimeBusy || !demo.runtime.controls.can_retry}>重试</button></div><div className="run-history"><h3>持久运行记录 <b>{demo.runtime.history.length}</b></h3>{demo.runtime.history.map((run) => <article key={run.run_id} className={run.run_id === demo.runtime.run_id ? "current" : ""}><span>{run.status}</span><div><strong>{run.run_id}</strong><p>{run.stage} · ATTEMPT {run.attempt}</p></div><small>{run.trace_id}</small></article>)}</div></>}</section>}
 
-        {tab === "agents" && <section><div className="system-panel-heading"><span>AGENT RUNTIME</span><b>{demo?.agents.length ?? 0} REGISTERED</b></div><div className="runtime-list">{demo?.agents.map((agent, index) => <article key={agent.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{agent.name}</strong><p>{agent.role}</p></div><aside><i className={agent.status === "ACTIVE" ? "active" : ""}/><b>{agent.status}</b><small>{agent.events} EVENTS</small></aside></article>)}</div></section>}
+        {tab === "agents" && <section><div className="system-panel-heading"><span>WORKER RUNTIME</span><b>{demo?.worker_queue.durable ? "DURABLE QUEUE" : "EPHEMERAL"}</b></div><div className="queue-summary"><div><span>PENDING</span><strong>{demo?.worker_queue.pending ?? 0}</strong></div><div><span>RUNNING</span><strong>{demo?.worker_queue.running ?? 0}</strong></div><div><span>FAILED</span><strong>{demo?.worker_queue.failed ?? 0}</strong></div><div><span>SUCCEEDED</span><strong>{demo?.worker_queue.succeeded ?? 0}</strong></div></div><div className="worker-jobs"><header><span>JOB QUEUE / {demo?.worker_queue.claim_mode ?? "OFFLINE"}</span><button onClick={processNextJob} disabled={!!jobBusy || !demo?.worker_queue.pending}>{jobBusy === "next" ? "领取中" : "执行下一项"}</button></header>{demo?.worker_queue.jobs.length ? demo.worker_queue.jobs.map((job) => <article key={job.job_id}><i className={job.status.toLowerCase()}/><div><strong>{job.skill}</strong><p>{job.agent_id} · {job.job_id}</p>{job.error && <small>{job.error}</small>}</div><aside><b>{job.status}</b><span>{job.attempt}/{job.max_attempts}</span>{job.status === "FAILED" && job.attempt < job.max_attempts && <button onClick={() => retryJob(job.job_id)} disabled={!!jobBusy}>{jobBusy === job.job_id ? "入队中" : "重试"}</button>}</aside></article>) : <p className="queue-empty">启动私人意图后，Manager 会把工作分派到持久队列。</p>}</div><div className="agent-registry-title"><span>AGENT REGISTRY</span><b>{demo?.agents.length ?? 0} REGISTERED</b></div><div className="runtime-list">{demo?.agents.map((agent, index) => <article key={agent.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{agent.name}</strong><p>{agent.role}</p></div><aside><i className={agent.status === "ACTIVE" ? "active" : ""}/><b>{agent.status}</b><small>{agent.events} EVENTS</small></aside></article>)}</div></section>}
 
         {tab === "skills" && <section><div className="system-panel-heading"><span>SKILL REGISTRY</span><b>VERSIONED CONTRACTS</b></div><div className="skill-matrix">{demo?.skills.map((skill) => <article key={skill.id}><header><span>{skill.id}</span><b>v{skill.version}</b></header><p>{skill.description}</p><footer><span>{skill.status}</span><b>{skill.invocations} INVOCATIONS</b></footer></article>)}</div></section>}
 

@@ -165,6 +165,21 @@ class DemoService:
                     last_checked_at TEXT,
                     details TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS worker_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    trace_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    skill TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    attempt INTEGER NOT NULL,
+                    max_attempts INTEGER NOT NULL,
+                    payload TEXT NOT NULL,
+                    result TEXT,
+                    error TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
             conn.executemany(
@@ -176,6 +191,9 @@ class DemoService:
                     ("github-local-sandbox/v1", 1, "HEALTHY", "LOCAL_WRITE", "repo:AgentReach:file:docs/vision.md", _iso(DEMO_NOW), "{}"),
                     ("agent-mailbox/v1", 1, "HEALTHY", "LOCAL_WRITE", "inbox:selected-peer:send", _iso(DEMO_NOW), "{}"),
                 ],
+            )
+            conn.execute(
+                "UPDATE worker_jobs SET status = 'PENDING', error = 'recovered_after_restart' WHERE status = 'RUNNING'"
             )
 
     def _get_state(self) -> dict[str, Any] | None:
@@ -332,6 +350,11 @@ class DemoService:
         for grant in state["connector_grants"]:
             if grant["status"] != "USED":
                 grant["status"] = "REVOKED"
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE worker_jobs SET status = 'CANCELLED', updated_at = ? WHERE run_id = ? AND status IN ('PENDING', 'RUNNING')",
+                (_iso(DEMO_NOW), state["run_id"]),
+            )
         self._save_state(state)
         return self.snapshot()
 
@@ -357,6 +380,94 @@ class DemoService:
             rows = conn.execute("SELECT * FROM task_runs ORDER BY rowid DESC LIMIT 30").fetchall()
         items = [dict(row) for row in rows]
         return {"total": len(items), "items": items}
+
+    def enqueue_job(self, agent_id: str, skill: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        state = self._get_state()
+        if state is None or state.get("runtime_status") != "RUNNING":
+            raise DemoError("只有运行中的任务可以接收 Worker Job。")
+        supported = {
+            "intent-structuring": "intent-worker",
+            "candidate-discovery": "discovery-worker",
+        }
+        if skill not in supported or supported[skill] != agent_id:
+            raise DemoError("Worker 与 Skill 绑定不合法。")
+        job_id = f"job-{uuid4().hex[:8]}"
+        now = _iso(DEMO_NOW + timedelta(seconds=self._trace_count(state)))
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO worker_jobs VALUES (?, ?, ?, ?, ?, 'PENDING', 0, 3, ?, NULL, NULL, ?, ?)",
+                (job_id, state["run_id"], state["trace_id"], agent_id, skill, json.dumps(payload or {}, ensure_ascii=False), now, now),
+            )
+        self._event(state, "personal-manager", "task-orchestration", "job.enqueued", "QUEUED", f"已将 {skill} 分派给 {agent_id}。", {"job_id": job_id, "agent": agent_id, "skill": skill})
+        return self.snapshot()
+
+    def process_next_job(self) -> dict[str, Any]:
+        state = self._get_state()
+        if state is None or state.get("runtime_status") != "RUNNING":
+            raise DemoError("当前 Run 未处于 RUNNING，Worker 不得领取任务。")
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT * FROM worker_jobs WHERE run_id = ? AND status = 'PENDING' ORDER BY rowid LIMIT 1",
+                (state["run_id"],),
+            ).fetchone()
+            if row is None:
+                raise DemoError("当前 Run 没有待处理的 Worker Job。")
+            attempt = row["attempt"] + 1
+            conn.execute(
+                "UPDATE worker_jobs SET status = 'RUNNING', attempt = ?, updated_at = ? WHERE job_id = ? AND status = 'PENDING'",
+                (attempt, _iso(DEMO_NOW), row["job_id"]),
+            )
+        self._event(state, row["agent_id"], row["skill"], "job.started", "RUNNING", f"Worker 已原子领取 {row['job_id']}。", {"job_id": row["job_id"], "attempt": attempt})
+        try:
+            payload = json.loads(row["payload"])
+            if row["skill"] == "intent-structuring":
+                result = self.structure_intent(str(payload.get("request", "")))
+            elif row["skill"] == "candidate-discovery":
+                result = self.discover()
+            else:
+                raise DemoError("没有可执行该 Skill 的 Worker。")
+        except DemoError as exc:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE worker_jobs SET status = 'FAILED', error = ?, updated_at = ? WHERE job_id = ?",
+                    (str(exc), _iso(DEMO_NOW), row["job_id"]),
+                )
+            current = self._get_state() or state
+            self._event(current, row["agent_id"], row["skill"], "job.failed", "FAILED", f"Worker Job {row['job_id']} 执行失败。", {"job_id": row["job_id"], "error": str(exc), "attempt": attempt})
+            return self.snapshot()
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE worker_jobs SET status = 'SUCCEEDED', result = ?, error = NULL, updated_at = ? WHERE job_id = ?",
+                (json.dumps({"stage": result["stage"]}, ensure_ascii=False), _iso(DEMO_NOW), row["job_id"]),
+            )
+        current = self._get_state() or state
+        self._event(current, row["agent_id"], row["skill"], "job.succeeded", "SUCCEEDED", f"Worker Job {row['job_id']} 已完成。", {"job_id": row["job_id"], "stage": result["stage"], "attempt": attempt})
+        return self.snapshot()
+
+    def retry_job(self, job_id: str) -> dict[str, Any]:
+        state = self._get_state()
+        if state is None or state.get("runtime_status") != "RUNNING":
+            raise DemoError("当前 Run 不能重试 Worker Job。")
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM worker_jobs WHERE job_id = ? AND run_id = ?", (job_id, state["run_id"])).fetchone()
+            if row is None or row["status"] != "FAILED":
+                raise DemoError("只有当前 Run 中失败的 Job 可以重试。")
+            if row["attempt"] >= row["max_attempts"]:
+                raise DemoError("Worker Job 已达到最大重试次数。")
+            conn.execute("UPDATE worker_jobs SET status = 'PENDING', error = NULL, updated_at = ? WHERE job_id = ?", (_iso(DEMO_NOW), job_id))
+        self._event(state, "personal-manager", "task-orchestration", "job.retried", "QUEUED", f"失败 Job {job_id} 已重新入队。", {"job_id": job_id, "next_attempt": row["attempt"] + 1})
+        return self.snapshot()
+
+    def start_task(self, request: str) -> dict[str, Any]:
+        self.reset()
+        self.enqueue_job("intent-worker", "intent-structuring", {"request": request})
+        first = self.process_next_job()
+        first_job = first["worker_queue"]["jobs"][-1]
+        if first_job["status"] != "SUCCEEDED":
+            return first
+        self.enqueue_job("discovery-worker", "candidate-discovery")
+        return self.process_next_job()
 
     def _connector(self, connector_id: str) -> sqlite3.Row:
         with self._connect() as conn:
@@ -1024,6 +1135,24 @@ class DemoService:
         with self._connect() as conn:
             memory_count = conn.execute("SELECT COUNT(*) FROM memory_records").fetchone()[0]
             connector_rows = conn.execute("SELECT * FROM connector_registry ORDER BY connector_id").fetchall()
+            job_rows = conn.execute("SELECT * FROM worker_jobs WHERE run_id = ? ORDER BY rowid", (state["run_id"],)).fetchall()
+            jobs = [
+                {
+                    "job_id": row["job_id"], "agent_id": row["agent_id"], "skill": row["skill"],
+                    "status": row["status"], "attempt": row["attempt"], "max_attempts": row["max_attempts"],
+                    "error": row["error"], "created_at": row["created_at"], "updated_at": row["updated_at"],
+                }
+                for row in job_rows
+            ]
+            result["worker_queue"] = {
+                "jobs": jobs,
+                "pending": sum(1 for job in jobs if job["status"] == "PENDING"),
+                "running": sum(1 for job in jobs if job["status"] == "RUNNING"),
+                "failed": sum(1 for job in jobs if job["status"] == "FAILED"),
+                "succeeded": sum(1 for job in jobs if job["status"] == "SUCCEEDED"),
+                "durable": True,
+                "claim_mode": "SQLITE_IMMEDIATE",
+            }
             result["connector_runtime"] = {
                 "receipts": conn.execute("SELECT COUNT(*) FROM action_receipts WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],
                 "mailbox_envelopes": conn.execute("SELECT COUNT(*) FROM mailbox_envelopes WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],

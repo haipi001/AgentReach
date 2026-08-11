@@ -89,3 +89,13 @@ def test_connector_control_endpoints_are_persistent():
     enabled = client.post("/api/connectors/toggle", json={"connector_id": "agent-mailbox/v1", "enabled": True})
     connector = next(item for item in enabled.json()["connector_runtime"]["connectors"] if item["id"] == "agent-mailbox/v1")
     assert connector["enabled"] is True
+
+
+def test_runtime_start_uses_durable_worker_queue():
+    client = TestClient(app)
+    response = client.post("/api/runtime/start", json={"request": "find queued peers"})
+    assert response.status_code == 200
+    state = response.json()
+    assert state["stage"] == "CANDIDATES_FOUND"
+    assert state["worker_queue"]["succeeded"] == 2
+    assert {job["agent_id"] for job in state["worker_queue"]["jobs"]} == {"intent-worker", "discovery-worker"}

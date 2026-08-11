@@ -55,6 +55,10 @@ class ConnectorToggleRequest(ConnectorRequest):
     enabled: bool
 
 
+class WorkerJobRequest(BaseModel):
+    job_id: str = Field(min_length=1, max_length=100)
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -90,6 +94,11 @@ def reset_demo():
 @app.post("/api/demo/intent")
 def structure_intent(payload: IntentRequest):
     return call(service.structure_intent, payload.request)
+
+
+@app.post("/api/runtime/start")
+def start_task(payload: IntentRequest):
+    return call(service.start_task, payload.request)
 
 
 @app.post("/api/demo/discover")
@@ -140,6 +149,16 @@ def cancel_run():
 @app.post("/api/runtime/retry")
 def retry_run():
     return call(service.retry_run)
+
+
+@app.post("/api/runtime/jobs/process-next")
+def process_next_job():
+    return call(service.process_next_job)
+
+
+@app.post("/api/runtime/jobs/retry")
+def retry_worker_job(payload: WorkerJobRequest):
+    return call(service.retry_job, payload.job_id)
 
 
 @app.get("/api/runtime/runs")
