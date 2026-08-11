@@ -22,11 +22,14 @@ export function IdentityLoadout() {
   const demo = useAgentStore((state) => state.demo);
   const persona = useAgentStore((state) => state.persona);
   const setDemo = useAgentStore((state) => state.setDemo);
-  const setView = useAgentStore((state) => state.setView);
   const openStudio = useAgentStore((state) => state.setPersonaStudioOpen);
   const [active, setActive] = useState<LoadoutSection>("relationship");
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
   const [busyRun, setBusyRun] = useState<string | null>(null);
+  const [busyControl, setBusyControl] = useState<string | null>(null);
+  const [expandedMemory, setExpandedMemory] = useState<string | null>(null);
+  const [confirmForget, setConfirmForget] = useState<string | null>(null);
+  const [controlError, setControlError] = useState("");
 
   useEffect(() => { memoryApi.search("").then((result) => setMemories(result.items)).catch(() => setMemories([])); }, []);
   const current = SECTION_META[active];
@@ -34,22 +37,60 @@ export function IdentityLoadout() {
   const healthyConnectors = demo?.connector_runtime.connectors.filter((connector) => connector.enabled && connector.status === "HEALTHY").length ?? 0;
   const projects = useMemo(() => demo?.runtime.history.slice(0, 8) ?? [], [demo?.runtime.history]);
 
+  function scrollToWorkspace() {
+    const target = document.getElementById("task-workspace");
+    if (!target) return;
+    const top = target.offsetTop;
+    window.scrollTo({ top, behavior: "smooth" });
+    window.setTimeout(() => { if (window.scrollY < top * .8) window.scrollTo({ top, behavior: "auto" }); }, 700);
+  }
+
   async function openProject(runId: string) {
     if (!demo || busyRun) return;
     setBusyRun(runId);
     try {
       const next = runId === demo.runtime.run_id ? demo : await demoApi.switchRun(runId);
-      setDemo(next); setView("self");
+      setDemo(next);
+      window.setTimeout(scrollToWorkspace, 40);
     } finally { setBusyRun(null); }
+  }
+
+  async function toggleSkill(skillId: string, enabled: boolean) {
+    if (busyControl) return;
+    setBusyControl(skillId); setControlError("");
+    try { setDemo(await demoApi.toggleSkill(skillId, enabled)); }
+    catch (reason) { setControlError(reason instanceof Error ? reason.message : "无法更新 Skill Loadout"); }
+    finally { setBusyControl(null); }
+  }
+
+  async function forgetMemory(memoryId: string) {
+    if (confirmForget !== memoryId) { setConfirmForget(memoryId); return; }
+    setBusyControl(memoryId); setControlError("");
+    try {
+      const result = await memoryApi.forget(memoryId);
+      setMemories(result.items); setDemo(await demoApi.get()); setConfirmForget(null); setExpandedMemory(null);
+    } catch (reason) { setControlError(reason instanceof Error ? reason.message : "无法遗忘 Memory"); }
+    finally { setBusyControl(null); }
+  }
+
+  async function controlConnector(connectorId: string, enabled: boolean) {
+    if (busyControl) return;
+    setBusyControl(connectorId); setControlError("");
+    try {
+      if (enabled) await demoApi.toggleConnector(connectorId, true);
+      const next = enabled ? await demoApi.checkConnector(connectorId) : await demoApi.toggleConnector(connectorId, false);
+      setDemo(next);
+    } catch (reason) { setControlError(reason instanceof Error ? reason.message : "无法更新 Connector"); }
+    finally { setBusyControl(null); }
   }
 
   const detail = {
     relationship: <div className="loadout-relationship"><div className="relation-line"><span>YOU</span><i/><span>{persona.name}</span></div><dl><div><dt>所有者</dt><dd>HAIPI / 本地身份</dd></div><div><dt>关系</dt><dd>私人代理 / 非公开 Profile</dd></div><div><dt>自治</dt><dd>L2 默认 · L3 强确认</dd></div><div><dt>信任</dt><dd>证据先于记忆</dd></div></dl><blockquote>“我的上下文留在身边。只有我决定时，它才向外抵达。”</blockquote></div>,
     parameters: <div className="loadout-specs"><dl><div><dt>形态</dt><dd>{persona.form.toUpperCase()}</dd></div><div><dt>材质</dt><dd>{persona.finish.toUpperCase()}</dd></div><div><dt>信号强度</dt><dd>{Math.round(persona.aura * 100)}%</dd></div><div><dt>运行状态</dt><dd>{demo?.runtime.status ?? "OFFLINE"}</dd></div><div><dt>当前阶段</dt><dd>{demo?.stage ?? "LOADING"}</dd></div><div><dt>活跃 Worker</dt><dd>{activeAgents}</dd></div></dl><button onClick={() => openStudio(true)}>调整虚拟形态 ↗</button></div>,
-    skills: <div className="loadout-items">{demo?.skills.map((skill, index) => <article key={skill.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{zh(skill.id)}</strong><p>{skill.description}</p></div><aside><b>{skill.status}</b><small>{skill.invocations} 次调用 · v{skill.version}</small></aside></article>)}</div>,
-    memory: <div className="loadout-items">{memories.length ? memories.map((memory, index) => <article key={memory.memory_id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{memory.summary}</strong><p>{memory.kind} · TRACE {memory.trace_id}</p></div><aside><b>{memory.verified ? "VERIFIED" : "UNVERIFIED"}</b><small>可信度 {Math.round(memory.score * 100)}%</small></aside></article>) : <div className="loadout-empty"><b>0 VERIFIED MEMORY</b><p>完成一次经过 Verifier 的现实行动后，可信经验会出现在这里。</p></div>}</div>,
+    skills: <div className="loadout-items skill-loadout-list">{demo?.skills.map((skill, index) => <article key={skill.id} className={skill.enabled ? "" : "disabled"}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{zh(skill.id)}</strong><p>{skill.description}</p></div><aside><b>{skill.status}</b><small>{skill.invocations} 次调用 · v{skill.version}</small><button disabled={!!busyControl} onClick={() => toggleSkill(skill.id, !skill.enabled)}>{busyControl === skill.id ? "同步中" : skill.enabled ? "停用" : "装载"}</button></aside></article>)}</div>,
+    memory: <div className="loadout-items memory-loadout-list">{memories.length ? memories.map((memory, index) => <article key={memory.memory_id} className={expandedMemory === memory.memory_id ? "expanded" : ""}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{memory.summary}</strong><p>{memory.kind} · TRACE {memory.trace_id}</p>{expandedMemory === memory.memory_id && <div className="memory-proof">{memory.evidence.map((proof) => <span key={`${proof.type}-${proof.label}`}><b>{proof.verified ? "✓" : "×"}</b>{zh(proof.label)} · {zh(proof.type)}</span>)}</div>}</div><aside><b>{memory.verified ? "VERIFIED" : "UNVERIFIED"}</b><small>可信度 {Math.round(memory.score * 100)}%</small><button onClick={() => { setExpandedMemory(expandedMemory === memory.memory_id ? null : memory.memory_id); setConfirmForget(null); }}>{expandedMemory === memory.memory_id ? "收起" : "证据"}</button>{expandedMemory === memory.memory_id && <button className="danger-control" disabled={!!busyControl} onClick={() => forgetMemory(memory.memory_id)}>{busyControl === memory.memory_id ? "遗忘中" : confirmForget === memory.memory_id ? "确认遗忘" : "遗忘"}</button>}</aside></article>) : <div className="loadout-empty"><b>0 VERIFIED MEMORY</b><p>完成一次经过 Verifier 的现实行动后，可信经验会出现在这里。</p></div>}</div>,
     projects: <div className="loadout-items">{projects.map((run, index) => <article key={run.run_id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{run.human_request || "未命名任务"}</strong><p>{run.stage} · ATTEMPT {run.attempt}</p></div><aside><b>{run.status}</b><button disabled={!!busyRun || !run.recoverable && run.run_id !== demo?.runtime.run_id} onClick={() => openProject(run.run_id)}>{busyRun === run.run_id ? "读取中" : run.run_id === demo?.runtime.run_id ? "进入" : run.recoverable ? "装载" : "旧记录"}</button></aside></article>)}</div>,
-    boundary: <div className="loadout-boundary"><div className="boundary-meter"><strong>{healthyConnectors}/{demo?.connector_runtime.connectors.length ?? 0}</strong><span>连接器就绪</span></div><ul>{demo?.privacy_invariants.map((rule, index) => <li key={rule}><span>0{index + 1}</span>{rule}</li>)}</ul><div className="connector-strips">{demo?.connector_runtime.connectors.map((connector) => <div key={connector.id}><i className={connector.status.toLowerCase()}/><strong>{connector.id}</strong><span>{connector.enabled ? connector.status : "DISABLED"}</span></div>)}</div></div>,
+    boundary: <div className="loadout-boundary"><div className="boundary-meter"><strong>{healthyConnectors}/{demo?.connector_runtime.connectors.length ?? 0}</strong><span>连接器就绪</span></div><ul>{demo?.privacy_invariants.map((rule, index) => <li key={rule}><span>0{index + 1}</span>{rule}</li>)}</ul><div className="connector-strips">{demo?.connector_runtime.connectors.map((connector) => <div key={connector.id}><i className={connector.status.toLowerCase()}/><strong>{connector.id}</strong><span>{connector.enabled ? connector.status : "DISABLED"}</span><button disabled={!!busyControl} onClick={() => controlConnector(connector.id, !connector.enabled)}>{busyControl === connector.id ? "检查中" : connector.enabled ? "停用" : "检查并启用"}</button></div>)}</div></div>,
   }[active];
 
   return <section className="identity-loadout" aria-label="AI 身份装载界面">
@@ -57,7 +98,7 @@ export function IdentityLoadout() {
     <aside className="loadout-score"><span>RELATION LEVEL</span><strong>07</strong><i><b style={{ width: "78%" }}/></i><small>PRIVATE TRUST / VERIFIED</small></aside>
     <div className="loadout-avatar"><AgentStage/><div className="avatar-tag"><span>{persona.name} / PERSONAL AGENT</span><b>{demo?.runtime.status ?? "LOCAL"}</b></div><div className="scan-line"/></div>
     <nav className="loadout-slots" aria-label="AI 装载分类">{(Object.keys(SECTION_META) as LoadoutSection[]).map((id) => { const item = SECTION_META[id]; const count = id === "skills" ? demo?.skills.length : id === "memory" ? demo?.memory_runtime.records : id === "projects" ? demo?.runtime.history.length : undefined; return <button key={id} className={active === id ? "active" : ""} onClick={() => setActive(id)}><span>{item.index}</span><i/><div><strong>{item.label}</strong><small>{item.title}</small></div>{count !== undefined && <b>{count}</b>}</button>; })}</nav>
-    <section className="loadout-detail" aria-live="polite"><header><div><span>{current.index} / {current.label}</span><h2>{current.title}</h2></div><b>{active.toUpperCase()}</b></header><p className="detail-lead">{current.description}</p>{detail}</section>
-    <div className="loadout-actions"><button onClick={() => setView("self")}><span>进入任务空间</span><b>OPEN TASKS ↗</b></button><button onClick={() => openStudio(true)}><span>编辑 AI</span><b>CALIBRATE</b></button></div>
+    <section className="loadout-detail" aria-live="polite"><header><div><span>{current.index} / {current.label}</span><h2>{current.title}</h2></div><b>{active.toUpperCase()}</b></header><p className="detail-lead">{current.description}</p>{controlError && <p className="loadout-control-error">{controlError}</p>}{detail}</section>
+    <div className="loadout-actions"><button onClick={scrollToWorkspace}><span>下滑查看任务空间</span><b>SCROLL / 02 ↓</b></button><button onClick={() => openStudio(true)}><span>编辑 AI</span><b>CALIBRATE</b></button></div>
   </section>;
 }

@@ -19,8 +19,7 @@ export default function Home() {
   const setDemo = useAgentStore((s) => s.setDemo);
   useEffect(() => { demoApi.get().then(setDemo).catch(() => undefined); }, [setDemo]);
   return <ExperienceFrame>
-    {view === "identity" && <IdentityLoadout />}
-    {view === "self" && <ProductWorkspace />}
+    {(view === "identity" || view === "self") && <div className="identity-scroll"><IdentityLoadout/><div id="task-workspace"><ProductWorkspace/></div></div>}
     <SystemPanel />
     <NotificationCenter />
     <PersonaStudio />

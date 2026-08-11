@@ -50,6 +50,7 @@ export const demoApi = {
   checkConnector: (connectorId: string) => request("/api/connectors/check", { connector_id: connectorId }),
   toggleConnector: (connectorId: string, enabled: boolean) => request("/api/connectors/toggle", { connector_id: connectorId, enabled }),
   revokeConnectorGrant: (connectorId: string) => request("/api/connectors/revoke-grant", { connector_id: connectorId }),
+  toggleSkill: (skillId: string, enabled: boolean) => request("/api/skills/toggle", { skill_id: skillId, enabled }),
 };
 
 async function memoryRequest(path: string, body: unknown): Promise<MemorySearchResult> {

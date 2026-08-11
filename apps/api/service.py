@@ -167,6 +167,13 @@ class DemoService:
                     last_checked_at TEXT,
                     details TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS skill_registry (
+                    skill_id TEXT PRIMARY KEY,
+                    enabled INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS worker_jobs (
                     job_id TEXT PRIMARY KEY,
                     run_id TEXT NOT NULL,
@@ -208,6 +215,11 @@ class DemoService:
                     ("github-local-sandbox/v1", 1, "HEALTHY", "LOCAL_WRITE", "repo:AgentReach:file:docs/vision.md", _iso(DEMO_NOW), "{}"),
                     ("agent-mailbox/v1", 1, "HEALTHY", "LOCAL_WRITE", "inbox:selected-peer:send", _iso(DEMO_NOW), "{}"),
                 ],
+            )
+            conn.executemany(
+                """INSERT OR IGNORE INTO skill_registry
+                (skill_id, enabled, status, version, updated_at) VALUES (?, 1, 'READY', '0.1.0', ?)""",
+                [(skill_id, _iso(DEMO_NOW)) for skill_id, _ in SKILL_META],
             )
             conn.execute(
                 "UPDATE worker_jobs SET status = 'PENDING', error = 'recovered_after_restart' WHERE status = 'RUNNING'"
@@ -442,6 +454,34 @@ class DemoService:
         )
         return self.snapshot()
 
+    def set_skill_enabled(self, skill_id: str, enabled: bool) -> dict[str, Any]:
+        state = self._get_state()
+        if state is None:
+            raise DemoError("Demo 尚未初始化。")
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM skill_registry WHERE skill_id = ?", (skill_id,)).fetchone()
+            if row is None:
+                raise DemoError("Skill 不存在于本地装载清单。")
+            if not enabled:
+                active_job = conn.execute(
+                    """SELECT job_id FROM worker_jobs WHERE skill = ? AND status IN ('PENDING', 'RUNNING') LIMIT 1""",
+                    (skill_id,),
+                ).fetchone()
+                if active_job is not None:
+                    raise DemoError("Skill 正在被 Worker 使用，不能停用。")
+            status = "READY" if enabled else "DISABLED"
+            conn.execute(
+                "UPDATE skill_registry SET enabled = ?, status = ?, updated_at = ? WHERE skill_id = ?",
+                (int(enabled), status, _iso(DEMO_NOW + timedelta(seconds=self._trace_count(state))), skill_id),
+            )
+        self._event(
+            state, "personal-manager", "task-orchestration", "skill.loadout.changed",
+            "ENABLED" if enabled else "DISABLED",
+            f"用户已在本地 AI Loadout 中{'启用' if enabled else '停用'} {skill_id}。",
+            {"skill_id": skill_id, "enabled": enabled, "scope": "local"},
+        )
+        return self.snapshot()
+
     def enqueue_job(self, agent_id: str, skill: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         state = self._get_state()
         if state is None or state.get("runtime_status") != "RUNNING":
@@ -456,6 +496,10 @@ class DemoService:
         }
         if skill not in supported or supported[skill] != agent_id:
             raise DemoError("Worker 与 Skill 绑定不合法。")
+        with self._connect() as conn:
+            registry = conn.execute("SELECT enabled FROM skill_registry WHERE skill_id = ?", (skill,)).fetchone()
+        if registry is not None and not registry["enabled"]:
+            raise DemoError(f"Skill {skill} 已从 AI Loadout 停用，Worker 不得执行。")
         job_id = f"job-{uuid4().hex[:8]}"
         now = _iso(DEMO_NOW + timedelta(seconds=self._trace_count(state)))
         with self._connect() as conn:
@@ -1253,12 +1297,16 @@ class DemoService:
             }
             for key, value in AGENT_META.items()
         ]
+        with self._connect() as conn:
+            skill_rows = {row["skill_id"]: row for row in conn.execute("SELECT * FROM skill_registry").fetchall()}
         result["skills"] = [
             {
                 "id": skill_id,
                 "description": description,
-                "version": "0.1.0",
-                "status": "READY",
+                "version": skill_rows[skill_id]["version"],
+                "status": skill_rows[skill_id]["status"],
+                "enabled": bool(skill_rows[skill_id]["enabled"]),
+                "updated_at": skill_rows[skill_id]["updated_at"],
                 "invocations": invocation_counts.get(skill_id, 0),
             }
             for skill_id, description in SKILL_META

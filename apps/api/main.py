@@ -55,6 +55,11 @@ class ConnectorToggleRequest(ConnectorRequest):
     enabled: bool
 
 
+class SkillToggleRequest(BaseModel):
+    skill_id: str = Field(min_length=1, max_length=100)
+    enabled: bool
+
+
 class WorkerJobRequest(BaseModel):
     job_id: str = Field(min_length=1, max_length=100)
 
@@ -207,6 +212,11 @@ def check_connector(payload: ConnectorRequest):
 @app.post("/api/connectors/toggle")
 def toggle_connector(payload: ConnectorToggleRequest):
     return call(service.set_connector_enabled, payload.connector_id, payload.enabled)
+
+
+@app.post("/api/skills/toggle")
+def toggle_skill(payload: SkillToggleRequest):
+    return call(service.set_skill_enabled, payload.skill_id, payload.enabled)
 
 
 @app.post("/api/connectors/revoke-grant")

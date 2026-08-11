@@ -271,6 +271,32 @@ def test_worker_queue_drives_task_start_with_persistent_job_history(service: Dem
     assert sum(1 for event in state["trace"] if event["event_type"] == "job.succeeded") == 2
 
 
+def test_skill_loadout_persists_and_gates_worker_execution(tmp_path: Path):
+    db_path = tmp_path / "skill-loadout.db"
+    service = DemoService(db_path)
+    disabled = service.set_skill_enabled("candidate-discovery", False)
+    skill = next(item for item in disabled["skills"] if item["id"] == "candidate-discovery")
+    assert skill["enabled"] is False
+    assert skill["status"] == "DISABLED"
+
+    service.enqueue_job("intent-worker", "intent-structuring", {"request": "blocked discovery"})
+    service.process_next_job()
+    with pytest.raises(DemoError, match="AI Loadout 停用"):
+        service.enqueue_job("discovery-worker", "candidate-discovery")
+
+    recovered = DemoService(db_path).snapshot()
+    recovered_skill = next(item for item in recovered["skills"] if item["id"] == "candidate-discovery")
+    assert recovered_skill["enabled"] is False
+    enabled = DemoService(db_path).set_skill_enabled("candidate-discovery", True)
+    assert next(item for item in enabled["skills"] if item["id"] == "candidate-discovery")["status"] == "READY"
+
+
+def test_active_skill_cannot_be_disabled(service: DemoService):
+    service.enqueue_job("intent-worker", "intent-structuring", {"request": "still pending"})
+    with pytest.raises(DemoError, match="正在被 Worker 使用"):
+        service.set_skill_enabled("intent-structuring", False)
+
+
 def test_failed_worker_job_can_be_requeued_and_retried(service: DemoService):
     queued = service.enqueue_job("discovery-worker", "candidate-discovery")
     job_id = queued["worker_queue"]["jobs"][0]["job_id"]

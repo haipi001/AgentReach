@@ -94,7 +94,7 @@ export type DemoState = {
   world_changed: boolean;
   trace: TraceEvent[];
   agents: { id: string; name: string; role: string; status: "ACTIVE" | "READY"; events: number }[];
-  skills: { id: string; description: string; version: string; status: string; invocations: number }[];
+  skills: { id: string; description: string; version: string; status: string; enabled: boolean; updated_at: string; invocations: number }[];
   connector_grants: { connector: string; scope: string; status: string; approval_id?: string }[];
   connector_runtime: {
     receipts: number;

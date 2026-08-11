@@ -92,6 +92,16 @@ def test_connector_control_endpoints_are_persistent():
     assert connector["enabled"] is True
 
 
+def test_skill_loadout_toggle_endpoint():
+    client = TestClient(app)
+    disabled = client.post("/api/skills/toggle", json={"skill_id": "candidate-discovery", "enabled": False})
+    assert disabled.status_code == 200
+    skill = next(item for item in disabled.json()["skills"] if item["id"] == "candidate-discovery")
+    assert skill["status"] == "DISABLED"
+    enabled = client.post("/api/skills/toggle", json={"skill_id": "candidate-discovery", "enabled": True})
+    assert next(item for item in enabled.json()["skills"] if item["id"] == "candidate-discovery")["enabled"] is True
+
+
 def test_runtime_start_uses_durable_worker_queue():
     client = TestClient(app)
     response = client.post("/api/runtime/start", json={"request": "find queued peers"})
