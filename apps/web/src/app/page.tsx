@@ -8,6 +8,7 @@ import { ReachScene } from "@/components/reach/ReachScene";
 import { PersonaStudio } from "@/components/spatial/PersonaStudio";
 import { ExperienceFrame } from "@/components/experience/ExperienceFrame";
 import { ProductWorkspace } from "@/components/workspace/ProductWorkspace";
+import { SystemPanel } from "@/components/system/SystemPanel";
 import { demoApi } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent-store";
 
@@ -17,6 +18,7 @@ export default function Home() {
   useEffect(() => { demoApi.get().then(setDemo).catch(() => undefined); }, [setDemo]);
   return <ExperienceFrame>
     {view === "self" && <ProductWorkspace />}
+    <SystemPanel />
     <PersonaStudio />
     <ReachScene /><CapsuleFlow /><ConnectedState /><TracePanel />
   </ExperienceFrame>;

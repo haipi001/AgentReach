@@ -52,7 +52,12 @@ def test_golden_loop_completes_with_independent_verification(service: DemoServic
     verifier_event = next(e for e in state["trace"] if e["event_type"] == "verification.completed")
     assert verifier_event["evidence"]["read_only"] is True
     assert state["trace"][-1]["event_type"] == "memory.experience_recorded"
-    assert state["connector_runtime"] == {"receipts": 2, "mailbox_envelopes": 1, "idempotent": True}
+    assert state["connector_runtime"]["receipts"] == 2
+    assert state["connector_runtime"]["mailbox_envelopes"] == 1
+    assert state["connector_runtime"]["idempotent"] is True
+    assert {connector["status"] for connector in state["connector_runtime"]["connectors"]} == {"HEALTHY"}
+    assert len(state["agents"]) == 7
+    assert len(state["skills"]) == 6
 
 
 def test_action_connectors_are_idempotent(service: DemoService):

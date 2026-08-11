@@ -9,6 +9,7 @@ type Store = {
   demo: DemoState | null;
   persona: PersonaConfig;
   personaStudioOpen: boolean;
+  systemPanelOpen: boolean;
   avatarAsset: { url: string; name: string } | null;
   setView: (view: ViewMode) => void;
   setAgentState: (agentState: AgentState) => void;
@@ -16,6 +17,7 @@ type Store = {
   setDemo: (demo: DemoState) => void;
   setPersona: (persona: Partial<PersonaConfig>) => void;
   setPersonaStudioOpen: (open: boolean) => void;
+  setSystemPanelOpen: (open: boolean) => void;
   setAvatarAsset: (asset: { url: string; name: string } | null) => void;
 };
 
@@ -26,6 +28,7 @@ export const useAgentStore = create<Store>()(persist((set) => ({
   demo: null,
   persona: { name: "HAIPI", form: "human", finish: "matte", accent: "lichen", aura: 0.52, face: { shape: "oval", skin: "warm", eyes: "charcoal", hairStyle: "hood", hairColor: "ink" } },
   personaStudioOpen: false,
+  systemPanelOpen: false,
   avatarAsset: null,
   setView: (view) => set({ view }),
   setAgentState: (agentState) => set({ agentState }),
@@ -33,6 +36,7 @@ export const useAgentStore = create<Store>()(persist((set) => ({
   setDemo: (demo) => set({ demo }),
   setPersona: (persona) => set((state) => ({ persona: { ...state.persona, ...persona } })),
   setPersonaStudioOpen: (personaStudioOpen) => set({ personaStudioOpen }),
+  setSystemPanelOpen: (systemPanelOpen) => set({ systemPanelOpen }),
   setAvatarAsset: (avatarAsset) => set({ avatarAsset }),
 }), {
   name: "agentreach-persona",

@@ -47,6 +47,15 @@ AGENT_META = {
     "verifier-worker": ("Verifier Agent", "只读验证审批、协议与 Trace"),
 }
 
+SKILL_META = [
+    ("intent-structuring", "Turn a human request into a private, validated Intent."),
+    ("candidate-discovery", "Rank eligible peers from shared Claims and local context."),
+    ("context-capsule", "Prepare minimum-sufficient disclosure with policy proof."),
+    ("introduction-handshake", "Run the consented peer introduction protocol."),
+    ("claim-publishing", "Publish bounded, revocable capability Claims."),
+    ("commitment-verification", "Verify approvals, protocol state and world evidence."),
+]
+
 
 class DemoError(RuntimeError):
     """A safe, user-visible invalid transition."""
@@ -690,8 +699,29 @@ class DemoService:
             raise DemoError("Demo 尚未初始化。")
         result = deepcopy(state)
         result["trace"] = self._trace(state)
+        invocation_counts: dict[str, int] = {}
+        for event in result["trace"]:
+            invocation_counts[event["skill"]] = invocation_counts.get(event["skill"], 0) + 1
+        latest_agent = result["trace"][-1]["agent"] if result["trace"] else None
         result["agents"] = [
-            {"id": key, "name": value[0], "role": value[1]} for key, value in AGENT_META.items()
+            {
+                "id": key,
+                "name": value[0],
+                "role": value[1],
+                "status": "ACTIVE" if key == latest_agent else "READY",
+                "events": sum(1 for event in result["trace"] if event["agent"] == key),
+            }
+            for key, value in AGENT_META.items()
+        ]
+        result["skills"] = [
+            {
+                "id": skill_id,
+                "description": description,
+                "version": "0.1.0",
+                "status": "READY",
+                "invocations": invocation_counts.get(skill_id, 0),
+            }
+            for skill_id, description in SKILL_META
         ]
         result["stage_index"] = STAGE_ORDER.index(state["stage"]) if state["stage"] in STAGE_ORDER else -1
         result["stage_total"] = len(STAGE_ORDER) - 1
@@ -706,5 +736,9 @@ class DemoService:
                 "receipts": conn.execute("SELECT COUNT(*) FROM action_receipts WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],
                 "mailbox_envelopes": conn.execute("SELECT COUNT(*) FROM mailbox_envelopes WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],
                 "idempotent": True,
+                "connectors": [
+                    {"id": "github-local-sandbox/v1", "status": "HEALTHY", "mode": "LOCAL", "write_scope": "repo:AgentReach:file:docs/vision.md"},
+                    {"id": "agent-mailbox/v1", "status": "HEALTHY", "mode": "LOCAL", "write_scope": "inbox:selected-peer:send"},
+                ],
             }
         return result

@@ -61,4 +61,16 @@ export type DemoState = {
   memory_updates: { memory_id: string; kind: string; summary: string }[];
   world_changed: boolean;
   trace: TraceEvent[];
+  agents: { id: string; name: string; role: string; status: "ACTIVE" | "READY"; events: number }[];
+  skills: { id: string; description: string; version: string; status: string; invocations: number }[];
+  connector_grants: { connector: string; scope: string; status: string; approval_id?: string }[];
+  connector_runtime: {
+    receipts: number;
+    mailbox_envelopes: number;
+    idempotent: boolean;
+    connectors: { id: string; status: string; mode: string; write_scope: string }[];
+  };
+  privacy_invariants: string[];
+  stage_index: number;
+  stage_total: number;
 };
