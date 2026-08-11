@@ -66,7 +66,9 @@ SELF SPACE
   → Memory updated
 ```
 
-The Self Space now includes a local-first Persona Studio. Users can customize the Personal Agent's display name, Monolith/Orbital/Totem form, Matte/Chrome/Porcelain finish, signal color, and aura intensity. Appearance preferences persist in the browser and never alter identity, policy, or permissions.
+The Self Space now includes a local-first Persona Studio. Users can customize the Personal Agent's display name, human face shape, skin, eyes, hair, abstract form, finish, signal color, and aura intensity. A rigged GLB can be loaded from the device for the current session without uploading it. Appearance preferences never alter identity, policy, or permissions. See [the human avatar architecture](docs/human-avatar-architecture.md).
+
+The spatial atmosphere uses a lazy-loaded Unicorn Studio scene as a decorative background layer. The agent body and all product interaction stay in the local R3F foreground; reduced-motion preferences pause the ambient scene.
 
 The GitHub integration is intentionally an honest local sandbox in this zero-dependency gate: its output lives under `data/demo-world/github/agentreach/`. The privacy attack can be run from the Trace panel without derailing the Golden Loop.
 

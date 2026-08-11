@@ -15,6 +15,6 @@ export const personalAgentData: Record<string, { title: string; lead: string; it
     { label: "People", value: "127" }, { label: "Trust Domains", value: "3" }, { label: "Open loops", value: "6" }, { label: "Shared graph", value: "NEVER" },
   ]},
   BOUNDARY: { title: "BOUNDARY", lead: "外发内容必须经过策略、最小披露与人工批准。", items: [
-    { label: "Status", value: "NORMAL" }, { label: "Auto", value: "L0–L1" }, { label: "Must ask", value: "L2–L3" }, { label: "Peer memory", value: "DENIED" },
+    { label: "Status", value: "NORMAL" }, { label: "Auto", value: "L0-L1" }, { label: "Must ask", value: "L2-L3" }, { label: "Peer memory", value: "DENIED" },
   ]},
 };

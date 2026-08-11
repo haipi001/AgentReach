@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentreach.dev/protocol/avatar-profile/v1/schema.json",
+  "title": "AgentReach Avatar Profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "owner", "renderer", "appearance", "privacy"],
+  "properties": {
+    "schema": { "const": "agentreach.avatar-profile/v1" },
+    "owner": { "type": "string", "minLength": 1 },
+    "renderer": { "enum": ["procedural-human", "glb", "vrm"] },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uri": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "license": { "type": "string" },
+        "morph_standard": { "enum": ["arkit-52", "vrm-1", "custom"] }
+      }
+    },
+    "appearance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["face_shape", "skin_tone", "eye_color", "hair_style", "hair_color"],
+      "properties": {
+        "face_shape": { "enum": ["soft", "oval", "angular"] },
+        "skin_tone": { "enum": ["porcelain", "warm", "umber", "deep"] },
+        "eye_color": { "enum": ["charcoal", "hazel", "moss"] },
+        "hair_style": { "enum": ["hood", "short", "bob", "bare"] },
+        "hair_color": { "enum": ["ink", "brown", "silver"] },
+        "morph_targets": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": -1, "maximum": 1 }
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_images_shared", "biometric_landmarks_shared"],
+      "properties": {
+        "source_images_shared": { "const": false },
+        "biometric_landmarks_shared": { "const": false }
+      }
+    }
+  }
+}

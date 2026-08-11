@@ -1,6 +1,6 @@
 # AgentReach development progress
 
-Updated: 2026-08-10
+Updated: 2026-08-11
 
 | Workstream | Status | Progress | Evidence | Next gate |
 | --- | --- | ---: | --- | --- |
@@ -9,8 +9,9 @@ Updated: 2026-08-10
 | World Action Gate | Complete | 100% | Repository write, Alice Inbox delivery, independent verification | Real GitHub OAuth connector |
 | Verified memory loop | Complete | 100% | Verified-only experience record and trace evidence | Retrieval and consolidation policies |
 | Spatial Self Space | Complete | 100% | R3F avatar, orbit navigation, Reach and evidence scenes | Accessibility and performance budget |
-| Persona Studio | Complete | 100% | Human form plus three abstract forms, material, color, aura, local persistence | Imported GLB avatars and rigging |
-| Human avatar v1 | Complete | 100% | Procedural humanoid silhouette, clothing profile, body signal ring | Authored character model and animation rig |
+| Spatial atmosphere | In progress | 80% | Unicorn Studio scene, lazy production CDN, reduced-motion pause, R3F foreground isolation | Variable manifest mapping and measured GPU budget |
+| Persona Studio | In progress | 85% | Face shape, skin, eyes, hair, local GLB import, local persistence | Morph-target binding and exportable profiles |
+| Human avatar v2 | In progress | 70% | Anatomical fallback, facial features, session-only rigged GLB renderer | Licensed SMPL-X or authored high-fidelity asset and animation rig |
 | Connector plane | In progress | 45% | Local GitHub sandbox, durable mailbox, scoped grants, persistent idempotency receipts | OAuth, revocation, retries |
 | Multi-agent runtime | Planned | 15% | Manager and worker boundaries exist as deterministic services | Separate worker processes and queues |
 | Trust domain deployment | Planned | 10% | Claims and boundary contracts exist | PostgreSQL, domain service, deployment manifests |
@@ -23,4 +24,4 @@ The current build proves one complete loop:
 
 `SELF → LOAD → REACH → UNDERSTAND → ACT → VERIFY → REMEMBER → SELF`
 
-The next recommended milestone is a real GitHub connector with OAuth, revocation, retries, and the same independent evidence contract used by the local sandbox. Local connector writes are already idempotent.
+The next avatar milestone is a morph-target adapter and an isolated local GPU service contract for SMPL-X body generation and MMPose pose input. The next connector milestone remains real GitHub OAuth, revocation, and retries.

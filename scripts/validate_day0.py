@@ -14,6 +14,7 @@ SCHEMAS = {
     "capsule": "agentreach.context-capsule/v1",
     "introduction": "agentreach.introduction/v1",
     "commitment": "agentreach.commitment/v1",
+    "avatar-profile": "agentreach.avatar-profile/v1",
 }
 SKILLS = {
     "intent-structuring",
@@ -56,7 +57,7 @@ def main() -> None:
 
     if errors:
         raise SystemExit("Day 0 validation failed:\n- " + "\n- ".join(errors))
-    print("Day 0 validation passed: 5 schemas, 6 agents, 6 skills, 5 demo identities.")
+    print(f"Day 0 validation passed: {len(SCHEMAS)} schemas, 6 agents, 6 skills, 5 demo identities.")
 
 
 if __name__ == "__main__":

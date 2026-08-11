@@ -11,6 +11,15 @@ page.on("pageerror", (error) => errors.push(error.message));
 try {
   await page.addInitScript(() => localStorage.setItem("agentreach-persona", JSON.stringify({ state: { persona: { name: "HAIPI", form: "human", finish: "matte", accent: "lichen", aura: 0.52 } }, version: 2 })));
   await page.goto("http://127.0.0.1:3000", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "CUSTOMIZE AI FORM" }).click();
+  await page.getByRole("button", { name: "angular" }).click();
+  await page.getByRole("button", { name: "bob" }).click();
+  await page.getByRole("button", { name: "Skin umber" }).click();
+  await page.getByRole("button", { name: "Eyes moss" }).click();
+  await page.getByRole("button", { name: "Hair brown" }).click();
+  await page.screenshot({ path: path.join(artifacts, "face-studio-734x936.png") });
+  await page.getByRole("button", { name: "KEEP THIS FORM" }).click();
+  await page.getByRole("dialog", { name: "Customize AI form" }).waitFor({ state: "hidden" });
   await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(artifacts, "human-avatar-734x936.png") });
   if (errors.length) throw new Error(errors.join("\n"));

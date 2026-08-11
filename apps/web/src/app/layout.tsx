@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AgentReach — My AI Space",
+  title: "AgentReach | My AI Space",
   description: "Privacy-preserving personal agent collaboration space",
 };
 

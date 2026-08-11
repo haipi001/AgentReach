@@ -2,6 +2,19 @@ export type AgentState = "idle" | "thinking" | "searching" | "waiting_approval" 
 export type ViewMode = "self" | "reach" | "capsule" | "connected";
 export type PersonaForm = "human" | "monolith" | "orbital" | "totem";
 export type PersonaFinish = "matte" | "chrome" | "porcelain";
+export type FaceShape = "soft" | "oval" | "angular";
+export type SkinTone = "porcelain" | "warm" | "umber" | "deep";
+export type EyeColor = "charcoal" | "hazel" | "moss";
+export type HairStyle = "hood" | "short" | "bob" | "bare";
+export type HairColor = "ink" | "brown" | "silver";
+
+export type FaceConfig = {
+  shape: FaceShape;
+  skin: SkinTone;
+  eyes: EyeColor;
+  hairStyle: HairStyle;
+  hairColor: HairColor;
+};
 
 export type PersonaConfig = {
   name: string;
@@ -9,7 +22,10 @@ export type PersonaConfig = {
   finish: PersonaFinish;
   accent: "lichen" | "cobalt" | "ember";
   aura: number;
+  face: FaceConfig;
 };
+
+export type ExperiencePlane = "self" | "agency" | "world" | "evidence";
 
 export type Candidate = {
   id: string;

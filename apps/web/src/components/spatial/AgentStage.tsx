@@ -21,7 +21,6 @@ export function AgentStage() {
   return (
     <div className={`canvas-shell state-${agentState} view-${view}`} aria-label={`AI avatar state ${agentState}`}>
       <Canvas key={compact ? "compact" : "wide"} shadows dpr={[1, 1.65]} camera={{ position: [0, compact ? 0.25 : 0.45, compact ? 9.3 : 7.3], fov: 36 }}>
-        <color attach="background" args={["#aeadb6"]} />
         <fog attach="fog" args={["#aeadb6", 7.5, 13]} />
         <ambientLight intensity={1.55} />
         <directionalLight position={[4, 7, 5]} intensity={2.4} color="#eef2e7" castShadow />
