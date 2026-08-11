@@ -73,3 +73,19 @@ def test_runtime_control_endpoints_preserve_and_retry_work():
     assert retried["runtime"]["attempt"] == 2
     runs = client.get("/api/runtime/runs").json()
     assert runs["total"] >= 2
+
+
+def test_connector_control_endpoints_are_persistent():
+    client = TestClient(app)
+    client.post("/api/demo/reset")
+    checked = client.post("/api/connectors/check", json={"connector_id": "agent-mailbox/v1"})
+    assert checked.status_code == 200
+    connector = next(item for item in checked.json()["connector_runtime"]["connectors"] if item["id"] == "agent-mailbox/v1")
+    assert connector["status"] == "HEALTHY"
+
+    disabled = client.post("/api/connectors/toggle", json={"connector_id": "agent-mailbox/v1", "enabled": False})
+    connector = next(item for item in disabled.json()["connector_runtime"]["connectors"] if item["id"] == "agent-mailbox/v1")
+    assert connector["enabled"] is False
+    enabled = client.post("/api/connectors/toggle", json={"connector_id": "agent-mailbox/v1", "enabled": True})
+    connector = next(item for item in enabled.json()["connector_runtime"]["connectors"] if item["id"] == "agent-mailbox/v1")
+    assert connector["enabled"] is True

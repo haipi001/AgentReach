@@ -30,6 +30,8 @@ export function SystemPanel() {
   const [confirmForget, setConfirmForget] = useState<string | null>(null);
   const [runtimeBusy, setRuntimeBusy] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [connectorBusy, setConnectorBusy] = useState<string | null>(null);
+  const [confirmConnector, setConfirmConnector] = useState<string | null>(null);
 
   async function testBoundary() {
     if (testing) return;
@@ -73,6 +75,29 @@ export function SystemPanel() {
     } finally { setRuntimeBusy(false); }
   }
 
+  async function checkConnector(connectorId: string) {
+    if (connectorBusy) return;
+    setConnectorBusy(connectorId);
+    try { setDemo(await demoApi.checkConnector(connectorId)); }
+    finally { setConnectorBusy(null); }
+  }
+
+  async function toggleConnector(connectorId: string, enabled: boolean) {
+    if (connectorBusy) return;
+    if (!enabled && confirmConnector !== `toggle:${connectorId}`) { setConfirmConnector(`toggle:${connectorId}`); return; }
+    setConnectorBusy(connectorId);
+    try { setDemo(await demoApi.toggleConnector(connectorId, enabled)); setConfirmConnector(null); }
+    finally { setConnectorBusy(null); }
+  }
+
+  async function revokeGrant(connectorId: string) {
+    if (connectorBusy) return;
+    if (confirmConnector !== `grant:${connectorId}`) { setConfirmConnector(`grant:${connectorId}`); return; }
+    setConnectorBusy(connectorId);
+    try { setDemo(await demoApi.revokeConnectorGrant(connectorId)); setConfirmConnector(null); }
+    finally { setConnectorBusy(null); }
+  }
+
   return <AnimatePresence>{open && <>
     <motion.button className="system-scrim" aria-label="关闭系统控制面" onClick={() => setOpen(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}/>
     <motion.aside className="system-panel" aria-label="AgentReach 系统控制面" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 260, damping: 30 }}>
@@ -86,7 +111,7 @@ export function SystemPanel() {
 
         {tab === "skills" && <section><div className="system-panel-heading"><span>SKILL REGISTRY</span><b>VERSIONED CONTRACTS</b></div><div className="skill-matrix">{demo?.skills.map((skill) => <article key={skill.id}><header><span>{skill.id}</span><b>v{skill.version}</b></header><p>{skill.description}</p><footer><span>{skill.status}</span><b>{skill.invocations} INVOCATIONS</b></footer></article>)}</div></section>}
 
-        {tab === "connectors" && <section><div className="system-panel-heading"><span>CONNECTOR PLANE</span><b>{demo?.connector_runtime.idempotent ? "IDEMPOTENT" : "UNSAFE"}</b></div><div className="connector-summary"><div><span>RECEIPTS</span><strong>{demo?.connector_runtime.receipts ?? 0}</strong></div><div><span>ENVELOPES</span><strong>{demo?.connector_runtime.mailbox_envelopes ?? 0}</strong></div><div><span>ACTIVE GRANTS</span><strong>{demo?.connector_grants.filter((grant) => grant.status === "ACTIVE").length ?? 0}</strong></div></div><div className="connector-list">{demo?.connector_runtime.connectors.map((connector) => <article key={connector.id}><div><i/><strong>{connector.id}</strong><span>{connector.status} / {connector.mode}</span></div><p>{connector.write_scope}</p></article>)}</div><div className="grant-list"><h3>SCOPED GRANTS</h3>{demo?.connector_grants.length ? demo.connector_grants.map((grant) => <article key={grant.connector}><span>{grant.connector}</span><b>{grant.status}</b><p>{grant.scope}</p></article>) : <p>候选确认后才会生成最小连接器授权。</p>}</div></section>}
+        {tab === "connectors" && <section><div className="system-panel-heading"><span>CONNECTOR PLANE</span><b>{demo?.connector_runtime.idempotent ? "IDEMPOTENT" : "UNSAFE"}</b></div><div className="connector-summary"><div><span>RECEIPTS</span><strong>{demo?.connector_runtime.receipts ?? 0}</strong></div><div><span>ENVELOPES</span><strong>{demo?.connector_runtime.mailbox_envelopes ?? 0}</strong></div><div><span>ACTIVE GRANTS</span><strong>{demo?.connector_grants.filter((grant) => grant.status === "ACTIVE").length ?? 0}</strong></div></div><div className="connector-list">{demo?.connector_runtime.connectors.map((connector) => <article key={connector.id} className={!connector.enabled ? "disabled" : ""}><div><i className={connector.status.toLowerCase()}/><strong>{connector.id}</strong><span>{connector.status} / {connector.mode}</span></div><p>{connector.write_scope}</p>{connector.details.remote && <small>{connector.details.remote} · HEAD {connector.details.head}</small>}<footer><button onClick={() => checkConnector(connector.id)} disabled={!!connectorBusy}>{connectorBusy === connector.id ? "检查中" : "健康检查"}</button><button onClick={() => toggleConnector(connector.id, !connector.enabled)} disabled={!!connectorBusy}>{connector.enabled ? confirmConnector === `toggle:${connector.id}` ? "确认停用" : "停用" : "启用"}</button></footer></article>)}</div><div className="grant-list"><h3>SCOPED GRANTS</h3>{demo?.connector_grants.length ? demo.connector_grants.map((grant) => <article key={grant.connector}><span>{grant.connector}</span><b>{grant.status}</b><p>{grant.scope}</p>{["ACTIVE", "PENDING_APPROVAL"].includes(grant.status) && <button onClick={() => revokeGrant(grant.connector)} disabled={!!connectorBusy}>{confirmConnector === `grant:${grant.connector}` ? "确认撤销" : "撤销授权"}</button>}</article>) : <p>候选确认后才会生成最小连接器授权。</p>}</div></section>}
 
         {tab === "memory" && <section><div className="system-panel-heading"><span>LOCAL MEMORY VAULT</span><b>{demo?.memory_runtime.records ?? 0} VERIFIED RECORDS</b></div><div className="memory-properties"><span>{demo?.memory_runtime.storage ?? "LOCAL"}</span><span>{demo?.memory_runtime.verified_only ? "VERIFIED ONLY" : "UNSAFE"}</span><span>{demo?.memory_runtime.survives_task_reset ? "PERSISTENT" : "EPHEMERAL"}</span></div><form className="memory-search" onSubmit={(event) => { event.preventDefault(); searchMemory(); }}><input value={memoryQuery} onChange={(event) => setMemoryQuery(event.target.value)} placeholder="搜索经验、Trace 或类型" aria-label="搜索本地记忆"/><button disabled={memoryBusy}>{memoryBusy ? "检索中" : "检索"}</button></form>{memories?.items.length ? <div className="memory-list">{memories.items.map((memory) => <article key={memory.memory_id}><header><span>{memory.kind}</span><b>VERIFIED</b></header><strong>{memory.summary}</strong><p>{memory.trace_id} · {memory.evidence.length} EVIDENCE</p><footer><span>{memory.memory_id}</span><button onClick={() => forget(memory.memory_id)} disabled={memoryBusy}>{confirmForget === memory.memory_id ? "确认遗忘" : "遗忘"}</button></footer></article>)}</div> : <div className="memory-empty"><strong>{memoryBusy ? "正在读取本地 Memory" : "没有匹配的可信记忆"}</strong><p>只有独立 Verifier 通过的世界变化可以进入这里。</p></div>}</section>}
 

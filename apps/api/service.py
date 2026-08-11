@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
+import subprocess
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -154,7 +156,26 @@ class DemoService:
                     updated_at TEXT NOT NULL,
                     finished_at TEXT
                 );
+                CREATE TABLE IF NOT EXISTS connector_registry (
+                    connector_id TEXT PRIMARY KEY,
+                    enabled INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    capability TEXT NOT NULL,
+                    last_checked_at TEXT,
+                    details TEXT NOT NULL
+                );
                 """
+            )
+            conn.executemany(
+                """INSERT OR IGNORE INTO connector_registry
+                (connector_id, enabled, status, mode, capability, last_checked_at, details)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    ("github-remote/v1", 1, "UNKNOWN", "LIVE_READONLY", "repo:haipi001/AgentReach:metadata:read", None, "{}"),
+                    ("github-local-sandbox/v1", 1, "HEALTHY", "LOCAL_WRITE", "repo:AgentReach:file:docs/vision.md", _iso(DEMO_NOW), "{}"),
+                    ("agent-mailbox/v1", 1, "HEALTHY", "LOCAL_WRITE", "inbox:selected-peer:send", _iso(DEMO_NOW), "{}"),
+                ],
             )
 
     def _get_state(self) -> dict[str, Any] | None:
@@ -336,6 +357,85 @@ class DemoService:
             rows = conn.execute("SELECT * FROM task_runs ORDER BY rowid DESC LIMIT 30").fetchall()
         items = [dict(row) for row in rows]
         return {"total": len(items), "items": items}
+
+    def _connector(self, connector_id: str) -> sqlite3.Row:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM connector_registry WHERE connector_id = ?", (connector_id,)).fetchone()
+        if row is None:
+            raise DemoError("连接器不存在。")
+        return row
+
+    def _require_connector(self, connector_id: str) -> None:
+        row = self._connector(connector_id)
+        if not row["enabled"]:
+            raise DemoError(f"连接器 {connector_id} 已停用，世界行动被阻断。")
+        if row["status"] not in {"HEALTHY", "UNKNOWN"}:
+            raise DemoError(f"连接器 {connector_id} 当前状态为 {row['status']}，世界行动被阻断。")
+
+    def check_connector(self, connector_id: str) -> dict[str, Any]:
+        row = self._connector(connector_id)
+        status = "HEALTHY"
+        details: dict[str, Any] = {}
+        try:
+            if connector_id == "github-remote/v1":
+                remote = subprocess.run(
+                    ["git", "remote", "get-url", "origin"], cwd=ROOT,
+                    capture_output=True, text=True, timeout=4, check=True,
+                ).stdout.strip()
+                probe = subprocess.run(
+                    ["git", "ls-remote", "--exit-code", "origin", "HEAD"], cwd=ROOT,
+                    capture_output=True, text=True, timeout=10, check=True,
+                )
+                details = {"remote": remote, "head": probe.stdout.split()[0][:12], "write_tested": False}
+            elif connector_id == "github-local-sandbox/v1":
+                self.repo_root.mkdir(parents=True, exist_ok=True)
+                if not os.access(self.repo_root, os.W_OK):
+                    raise OSError("sandbox_not_writable")
+                details = {"root": str(self.repo_root), "writable": True}
+            elif connector_id == "agent-mailbox/v1":
+                with self._connect() as conn:
+                    conn.execute("SELECT 1 FROM mailbox_envelopes LIMIT 1").fetchone()
+                details = {"storage": "LOCAL_SQLITE", "writable": True}
+        except (OSError, subprocess.SubprocessError) as exc:
+            status = "DEGRADED"
+            details = {"reason": type(exc).__name__}
+        checked_at = _iso(DEMO_NOW + timedelta(seconds=1))
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE connector_registry SET status = ?, last_checked_at = ?, details = ? WHERE connector_id = ?",
+                (status, checked_at, json.dumps(details, ensure_ascii=False), connector_id),
+            )
+        state = self._get_state()
+        if state is not None:
+            self._event(state, "personal-manager", "connector-health", "connector.checked", status, f"连接器 {connector_id} 健康检查完成。", {"connector": connector_id, "status": status})
+        return self.snapshot()
+
+    def set_connector_enabled(self, connector_id: str, enabled: bool) -> dict[str, Any]:
+        self._connector(connector_id)
+        with self._connect() as conn:
+            conn.execute("UPDATE connector_registry SET enabled = ? WHERE connector_id = ?", (1 if enabled else 0, connector_id))
+        state = self._get_state()
+        if state is None:
+            raise DemoError("Demo 尚未初始化。")
+        if not enabled:
+            for grant in state["connector_grants"]:
+                if grant["connector"] == connector_id and grant["status"] in {"PENDING_APPROVAL", "ACTIVE"}:
+                    grant["status"] = "REVOKED"
+        self._save_state(state)
+        self._event(state, "personal-manager", "connector-control", "connector.enabled" if enabled else "connector.disabled", "ALLOW_LOCAL_OWNER", f"连接器 {connector_id} 已{'启用' if enabled else '停用'}。", {"connector": connector_id, "enabled": enabled})
+        return self.snapshot()
+
+    def revoke_connector_grant(self, connector_id: str) -> dict[str, Any]:
+        state = self._get_state()
+        if state is None:
+            raise DemoError("Demo 尚未初始化。")
+        grant = next((item for item in state["connector_grants"] if item["connector"] == connector_id), None)
+        if grant is None or grant["status"] not in {"PENDING_APPROVAL", "ACTIVE"}:
+            raise DemoError("没有可撤销的连接器授权。")
+        grant["status"] = "REVOKED"
+        self._save_state(state)
+        self._event(state, "boundary-worker", "connector-control", "connector.grant_revoked", "REVOKED", f"用户撤销 {connector_id} 的最小授权。", {"connector": connector_id, "scope": grant["scope"]})
+        return self.snapshot()
 
     def structure_intent(self, request: str) -> dict[str, Any]:
         state = self._require("CREATED")
@@ -596,10 +696,15 @@ class DemoService:
 
     def approve_and_verify_commitment(self) -> dict[str, Any]:
         state = self._require("COMMITMENT_PROPOSED")
+        revoked = [grant["connector"] for grant in state["connector_grants"] if grant["status"] == "REVOKED"]
+        if revoked:
+            raise DemoError("连接器授权已撤销，不能执行世界行动：" + ", ".join(revoked))
         commitment_approval = f"apr-commit-{uuid4().hex[:6]}"
         state["commitment"]["party_a_approval"] = commitment_approval
         state["commitment"]["status"] = "accepted"
         for grant in state["connector_grants"]:
+            if grant["status"] != "PENDING_APPROVAL":
+                raise DemoError(f"连接器 {grant['connector']} 授权状态异常。")
             grant["status"] = "ACTIVE"
             grant["approval_id"] = commitment_approval
         self._save_state(state)
@@ -656,6 +761,12 @@ class DemoService:
         cached = self._cached_action_results(state["trace_id"])
         if len(cached) == 2:
             return cached
+        self._require_connector("github-local-sandbox/v1")
+        self._require_connector("agent-mailbox/v1")
+        for connector_id in ("github-local-sandbox/v1", "agent-mailbox/v1"):
+            grant = next((item for item in state["connector_grants"] if item["connector"] == connector_id), None)
+            if grant is None or grant.get("status") != "ACTIVE" or grant.get("approval_id") != approval_id:
+                raise DemoError(f"连接器 {connector_id} 缺少当前强审批授权。")
         vision_path = self.repo_root / "docs" / "vision.md"
         vision_path.parent.mkdir(parents=True, exist_ok=True)
         content = (
@@ -676,6 +787,7 @@ class DemoService:
             "idempotency_key": f"{state['trace_id']}:update-repository",
         }
         self._save_action_receipt(state, repo_result)
+        next(item for item in state["connector_grants"] if item["connector"] == "github-local-sandbox/v1")["status"] = "USED"
         self._event(state, "action-worker", "repository-write", "action.repository.updated", "EXECUTED", "Action Agent 已在 GitHub 本地沙箱创建 AgentReach/docs/vision.md。", repo_result)
 
         envelope_id = f"env-{uuid4().hex[:8]}"
@@ -701,6 +813,7 @@ class DemoService:
             "idempotency_key": f"{state['trace_id']}:send-collaboration-request",
         }
         self._save_action_receipt(state, mailbox_result)
+        next(item for item in state["connector_grants"] if item["connector"] == "agent-mailbox/v1")["status"] = "USED"
         self._event(state, "action-worker", "mailbox-send", "action.mailbox.sent", "EXECUTED", "Action Agent 已将协作请求投递到 Alice Agent Inbox。", mailbox_result)
         return [repo_result, mailbox_result]
 
@@ -910,13 +1023,18 @@ class DemoService:
         ]
         with self._connect() as conn:
             memory_count = conn.execute("SELECT COUNT(*) FROM memory_records").fetchone()[0]
+            connector_rows = conn.execute("SELECT * FROM connector_registry ORDER BY connector_id").fetchall()
             result["connector_runtime"] = {
                 "receipts": conn.execute("SELECT COUNT(*) FROM action_receipts WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],
                 "mailbox_envelopes": conn.execute("SELECT COUNT(*) FROM mailbox_envelopes WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],
                 "idempotent": True,
                 "connectors": [
-                    {"id": "github-local-sandbox/v1", "status": "HEALTHY", "mode": "LOCAL", "write_scope": "repo:AgentReach:file:docs/vision.md"},
-                    {"id": "agent-mailbox/v1", "status": "HEALTHY", "mode": "LOCAL", "write_scope": "inbox:selected-peer:send"},
+                    {
+                        "id": row["connector_id"], "status": "DISABLED" if not row["enabled"] else row["status"],
+                        "enabled": bool(row["enabled"]), "mode": row["mode"], "write_scope": row["capability"],
+                        "last_checked_at": row["last_checked_at"], "details": json.loads(row["details"]),
+                    }
+                    for row in connector_rows
                 ],
             }
             result["memory_runtime"] = {

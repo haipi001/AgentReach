@@ -55,7 +55,8 @@ def test_golden_loop_completes_with_independent_verification(service: DemoServic
     assert state["connector_runtime"]["receipts"] == 2
     assert state["connector_runtime"]["mailbox_envelopes"] == 1
     assert state["connector_runtime"]["idempotent"] is True
-    assert {connector["status"] for connector in state["connector_runtime"]["connectors"]} == {"HEALTHY"}
+    assert {connector["status"] for connector in state["connector_runtime"]["connectors"]} == {"HEALTHY", "UNKNOWN"}
+    assert len(state["connector_runtime"]["connectors"]) == 3
     assert len(state["agents"]) == 7
     assert len(state["skills"]) == 6
 
@@ -164,3 +165,24 @@ def test_paused_run_survives_service_restart(tmp_path: Path):
     assert recovered["runtime"]["run_id"] == paused["runtime"]["run_id"]
     assert recovered["runtime"]["status"] == "PAUSED"
     assert recovered["stage"] == "INTENT_PARSED"
+
+
+def test_connector_registry_health_toggle_and_revocation_gate(service: DemoService):
+    checked = service.check_connector("github-local-sandbox/v1")
+    local = next(item for item in checked["connector_runtime"]["connectors"] if item["id"] == "github-local-sandbox/v1")
+    assert local["status"] == "HEALTHY"
+    assert local["details"]["writable"] is True
+
+    state = advance_to_candidates(service)
+    service.select_candidate(state["candidates"][0]["id"])
+    service.approve_introduction()
+    service.peer_decision(True)
+    revoked = service.revoke_connector_grant("github-local-sandbox/v1")
+    grant = next(item for item in revoked["connector_grants"] if item["connector"] == "github-local-sandbox/v1")
+    assert grant["status"] == "REVOKED"
+    with pytest.raises(DemoError, match="授权已撤销"):
+        service.approve_and_verify_commitment()
+
+    disabled = service.set_connector_enabled("agent-mailbox/v1", False)
+    mailbox = next(item for item in disabled["connector_runtime"]["connectors"] if item["id"] == "agent-mailbox/v1")
+    assert mailbox["status"] == "DISABLED"

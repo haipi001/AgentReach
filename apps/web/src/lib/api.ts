@@ -43,6 +43,9 @@ export const demoApi = {
   resumeRun: () => request("/api/runtime/resume"),
   cancelRun: () => request("/api/runtime/cancel"),
   retryRun: () => request("/api/runtime/retry"),
+  checkConnector: (connectorId: string) => request("/api/connectors/check", { connector_id: connectorId }),
+  toggleConnector: (connectorId: string, enabled: boolean) => request("/api/connectors/toggle", { connector_id: connectorId, enabled }),
+  revokeConnectorGrant: (connectorId: string) => request("/api/connectors/revoke-grant", { connector_id: connectorId }),
 };
 
 async function memoryRequest(path: string, body: unknown): Promise<MemorySearchResult> {

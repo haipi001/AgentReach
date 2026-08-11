@@ -47,6 +47,14 @@ class MemoryForgetRequest(BaseModel):
     memory_id: str = Field(min_length=1, max_length=100)
 
 
+class ConnectorRequest(BaseModel):
+    connector_id: str = Field(min_length=1, max_length=100)
+
+
+class ConnectorToggleRequest(ConnectorRequest):
+    enabled: bool
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -137,6 +145,21 @@ def retry_run():
 @app.get("/api/runtime/runs")
 def list_runs():
     return service.list_runs()
+
+
+@app.post("/api/connectors/check")
+def check_connector(payload: ConnectorRequest):
+    return call(service.check_connector, payload.connector_id)
+
+
+@app.post("/api/connectors/toggle")
+def toggle_connector(payload: ConnectorToggleRequest):
+    return call(service.set_connector_enabled, payload.connector_id, payload.enabled)
+
+
+@app.post("/api/connectors/revoke-grant")
+def revoke_connector_grant(payload: ConnectorRequest):
+    return call(service.revoke_connector_grant, payload.connector_id)
 
 
 @app.post("/api/memory/search")

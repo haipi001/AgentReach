@@ -85,7 +85,15 @@ export type DemoState = {
     receipts: number;
     mailbox_envelopes: number;
     idempotent: boolean;
-    connectors: { id: string; status: string; mode: string; write_scope: string }[];
+    connectors: {
+      id: string;
+      status: string;
+      enabled: boolean;
+      mode: string;
+      write_scope: string;
+      last_checked_at: string | null;
+      details: { remote?: string; head?: string; root?: string; storage?: string; writable?: boolean; write_tested?: boolean; reason?: string };
+    }[];
   };
   privacy_invariants: string[];
   stage_index: number;
