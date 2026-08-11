@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { demoApi } from "@/lib/api";
 import { zh } from "@/lib/i18n";
 import { useAgentStore } from "@/stores/agent-store";
@@ -14,6 +14,12 @@ export function CapsuleFlow() {
   const setState = useAgentStore((s) => s.setAgentState);
   const [step, setStep] = useState<"capsule" | "peer" | "commitment">("capsule");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (demo?.stage === "WAITING_PEER_APPROVAL" || demo?.stage === "INTRO_SENT") setStep("peer");
+    if (demo?.stage === "COMMITMENT_PROPOSED" || demo?.stage === "INTRO_ACCEPTED") setStep("commitment");
+    if (demo?.stage === "WAITING_USER_APPROVAL") setStep("capsule");
+  }, [demo?.stage]);
 
   async function perform(action: () => Promise<Awaited<ReturnType<typeof demoApi.get>>>, next: typeof step | "done") {
     setBusy(true);

@@ -7,9 +7,7 @@ import { ConnectedState } from "@/components/reach/ConnectedState";
 import { ReachScene } from "@/components/reach/ReachScene";
 import { PersonaStudio } from "@/components/spatial/PersonaStudio";
 import { ExperienceFrame } from "@/components/experience/ExperienceFrame";
-import { CapabilityAtlas } from "@/components/experience/CapabilityAtlas";
-import { ImmersiveHero } from "@/components/experience/ImmersiveHero";
-import { AgencyManifesto } from "@/components/experience/AgencyManifesto";
+import { ProductWorkspace } from "@/components/workspace/ProductWorkspace";
 import { demoApi } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent-store";
 
@@ -18,9 +16,7 @@ export default function Home() {
   const setDemo = useAgentStore((s) => s.setDemo);
   useEffect(() => { demoApi.get().then(setDemo).catch(() => undefined); }, [setDemo]);
   return <ExperienceFrame>
-    <ImmersiveHero />
-    {view === "self" && <AgencyManifesto />}
-    {view === "self" && <CapabilityAtlas />}
+    {view === "self" && <ProductWorkspace />}
     <PersonaStudio />
     <ReachScene /><CapsuleFlow /><ConnectedState /><TracePanel />
   </ExperienceFrame>;

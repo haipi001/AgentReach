@@ -2,15 +2,31 @@ import type { DemoState } from "@/types/agent";
 
 const API = process.env.NEXT_PUBLIC_AGENTREACH_API ?? "http://127.0.0.1:8765";
 
+async function readSnapshot(): Promise<DemoState> {
+  const response = await fetch(`${API}/api/demo`, { cache: "no-store" });
+  if (!response.ok) throw new Error("无法读取 Personal Agent 的权威状态");
+  return response.json();
+}
+
 async function request(path: string, body?: unknown): Promise<DemoState> {
-  const response = await fetch(`${API}${path}`, {
-    method: path === "/api/demo" ? "GET" : "POST",
-    headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.detail ?? "协议请求失败");
-  return data;
+  const isRead = path === "/api/demo";
+  if (isRead) return readSnapshot();
+  try {
+    const response = await fetch(`${API}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail ?? "协议请求失败");
+    return data;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      await new Promise((resolve) => window.setTimeout(resolve, 180));
+      return readSnapshot();
+    }
+    throw error;
+  }
 }
 
 export const demoApi = {
