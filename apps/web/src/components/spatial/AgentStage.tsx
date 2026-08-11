@@ -4,8 +4,8 @@ import { Sparkles } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useEffect, useState } from "react";
 import { AgentAvatar } from "./AgentAvatar";
-import { EditorialPresence } from "./EditorialPresence";
 import { GroundRings } from "./GroundRings";
+import { AgentHead } from "./AgentHead";
 import { useAgentStore } from "@/stores/agent-store";
 
 export function AgentStage() {
@@ -22,16 +22,13 @@ export function AgentStage() {
   }, []);
   return <>
     <div className={`canvas-shell state-${agentState} view-${view}`} aria-label={`AI avatar state ${agentState}`}>
-      <Canvas key={compact ? "compact" : "wide"} shadows dpr={[1, 1.65]} camera={{ position: [0, compact ? 0.25 : 0.45, compact ? 9.3 : 7.3], fov: 36 }}>
-        <fog attach="fog" args={["#aeadb6", 7.5, 13]} />
-        <ambientLight intensity={1.55} />
-        <directionalLight position={[4, 7, 5]} intensity={2.4} color="#eef2e7" castShadow />
-        <pointLight position={[-4, 1, 3]} intensity={6} color="#dce7d3" distance={8} />
-        {avatarAsset && <AgentAvatar state={agentState} persona={persona} />}
-        <GroundRings reaching={view === "reach"} />
-        <Sparkles count={view === "reach" ? 85 : 34} scale={[11, 7, 5]} size={1.3} speed={0.12} opacity={0.3} color="#e8eee0" />
+      <Canvas key={compact ? "compact" : "wide"} shadows dpr={[1, 1.8]} gl={{ alpha: true, antialias: true }} camera={{ position: [0, compact ? 0 : .02, compact ? 9.4 : 9], fov: compact ? 32 : 30 }}>
+        <ambientLight intensity={1.8} />
+        <directionalLight position={[3.6, 5, 5]} intensity={4.2} color="#fffef2" castShadow />
+        <directionalLight position={[-4, 1, 2]} intensity={2.1} color="#c9ff50" />
+        {avatarAsset ? <AgentAvatar state={agentState} persona={persona} /> : <AgentHead persona={persona} />}
+        {view === "reach" && <><GroundRings reaching /><Sparkles count={50} scale={[8, 6, 4]} size={1} speed={.1} opacity={.2} color="#d2ff00" /></>}
       </Canvas>
     </div>
-    {!avatarAsset && <EditorialPresence />}
   </>;
 }

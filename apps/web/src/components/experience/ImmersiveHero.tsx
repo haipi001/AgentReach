@@ -2,10 +2,7 @@
 
 import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
 import { useRef, type MouseEvent } from "react";
-import { AgentComposer } from "@/components/chat/AgentComposer";
-import { AgentPanel } from "@/components/agent/AgentPanel";
 import { AgentStage } from "@/components/spatial/AgentStage";
-import { IdentityHalo } from "@/components/spatial/IdentityHalo";
 import { useAgentStore } from "@/stores/agent-store";
 
 export function ImmersiveHero() {
@@ -32,29 +29,21 @@ export function ImmersiveHero() {
 
   return <section ref={track} className="hero-track" onMouseMove={move} onMouseLeave={() => { pointerX.set(0); pointerY.set(0); }}>
     <div className="hero-sticky">
-      <div className="hero-chapter"><span>001</span><b>EMBODIED AGENT</b></div>
-      <motion.div className="hero-type hero-type-left" style={{ x: useTransform(x, value => value * -.65), y: copyY, opacity: copyOpacity }} aria-hidden="true">MY</motion.div>
-      <motion.div className="hero-type hero-type-right" style={{ x: useTransform(x, value => value * .65), y: copyY, opacity: copyOpacity }} aria-hidden="true">AI</motion.div>
+      <div className="hero-monogram" aria-hidden="true">AR</div>
       <motion.div className="hero-presence-stage" style={{ x, y: useTransform([y, presenceY], ([a, b]) => Number(a) + Number(b)), scale: presenceScale }}>
         <AgentStage />
       </motion.div>
       <div className="grain" aria-hidden="true" />
-      <motion.section className="self-copy" style={{ y: copyY, opacity: copyOpacity }}>
-        <span>AGENTREACH / PRIVATE PRESENCE</span>
-        <h1>Not a profile.<br/><em>A presence.</em></h1>
-        <p>Your context stays close. Your agent reaches outward only when you decide.</p>
-      </motion.section>
-      <IdentityHalo />
       {view === "self" && <button className="mobile-customize" onClick={() => openStudio(true)}>CUSTOMIZE AI FORM</button>}
       <aside className="hero-status-card">
-        <header><span>LIVE</span><b>AR</b></header>
-        <div><small>ACTIVE SYSTEM</small><strong>HAIPI<br/>LOCAL</strong></div>
+        <small>TRUST STATE</small>
+        <div className="status-orbit" aria-hidden="true"><i/><i/></div>
         <i />
-        <dl><dt>AUTONOMY</dt><dd>L2</dd><dt>BOUNDARY</dt><dd>NORMAL</dd></dl>
+        <dl><dt>AGENT</dt><dd>HAIPI</dd><dt>BOUNDARY</dt><dd>LOCAL</dd></dl>
       </aside>
-      {view === "self" && <AgentPanel />}
-      {view === "self" && <AgentComposer />}
-      <div className="hero-scroll-label"><span>SCROLL TO ENTER</span><b>↓</b></div>
+      <div className="hero-lock-label"><span>MOVE TO RECOMPOSE</span><b>DRAG / SCROLL</b></div>
+      <motion.div className="hero-caption" style={{ y: copyY, opacity: copyOpacity }}><span>MY AI</span><b>PRIVATE PRESENCE<br/>SINCE 2026</b></motion.div>
+      <div className="hero-scroll-label"><span>SCROLL</span><b>↓</b></div>
       <motion.div className="global-scroll-progress" style={{ scaleY: scrollYProgress }} />
     </div>
   </section>;
