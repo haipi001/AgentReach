@@ -41,3 +41,18 @@ def test_local_session_survives_runtime_restart(tmp_path):
     assert identities["active_profile_id"] == profile_id
     assert identities["session_id"] == session_id
     assert restarted.snapshot()["human_request"] == "persistent private task"
+
+
+def test_operational_metrics_are_isolated_per_owner(tmp_path):
+    runtime = LocalIdentityRuntime(tmp_path / "metrics-owner.db")
+    first_profile = runtime.identities()["active_profile_id"]
+    runtime.start_task("owner one task")
+    first_total = runtime.operational_metrics()["runs"]["total"]
+
+    runtime.create_identity("Metrics Owner B", "ORBIT")
+    second_metrics = runtime.operational_metrics()
+    assert second_metrics["runs"]["total"] == 1
+    assert second_metrics["workers"]["total"] == 0
+
+    runtime.switch_identity(first_profile)
+    assert runtime.operational_metrics()["runs"]["total"] == first_total

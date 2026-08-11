@@ -91,6 +91,19 @@ export type IdentityRuntime = {
   profiles: IdentityProfile[];
 };
 
+export type OperationalMetrics = {
+  health: "HEALTHY" | "ATTENTION" | "CRITICAL";
+  generated_at: string;
+  runs: { total: number; active: number; paused: number; completed: number; failed: number; cancelled: number; success_rate: number };
+  workers: { total: number; pending: number; running: number; failed: number; succeeded: number };
+  actions: { total: number; pending: number; running: number; failed: number; succeeded: number; receipts: number };
+  connectors: { enabled: number; healthy: number; degraded: number };
+  memory_records: number;
+  unread_notifications: number;
+  recovery_events: number;
+  incidents: { source: "WORKER" | "OUTBOX"; item_id: string; operation: string; status: string; error: string | null; updated_at: string }[];
+};
+
 export type DemoState = {
   stage: string;
   trace_id: string;

@@ -166,3 +166,11 @@ def test_outbox_retry_endpoint_rejects_unknown_action():
     client = TestClient(app)
     response = client.post("/api/runtime/outbox/retry", json={"outbox_id": "out-missing"})
     assert response.status_code == 409
+
+
+def test_operational_metrics_endpoint_reads_durable_runtime():
+    client = TestClient(app)
+    payload = client.get("/api/runtime/metrics")
+    assert payload.status_code == 200
+    assert payload.json()["health"] in {"HEALTHY", "ATTENTION", "CRITICAL"}
+    assert set(payload.json()["runs"]) >= {"total", "completed", "success_rate"}

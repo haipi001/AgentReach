@@ -214,6 +214,11 @@ def list_runs():
     return service.list_runs()
 
 
+@app.get("/api/runtime/metrics")
+def runtime_metrics():
+    return service.operational_metrics()
+
+
 @app.post("/api/runtime/switch")
 def switch_run(payload: RunRequest):
     return call(service.switch_run, payload.run_id)

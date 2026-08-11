@@ -1,4 +1,4 @@
-import type { DemoState, IdentityRuntime, MemorySearchResult, NotificationResult } from "@/types/agent";
+import type { DemoState, IdentityRuntime, MemorySearchResult, NotificationResult, OperationalMetrics } from "@/types/agent";
 
 const API = process.env.NEXT_PUBLIC_AGENTREACH_API ?? "http://127.0.0.1:8765";
 
@@ -106,3 +106,10 @@ export const identityApi = {
   create: (displayName: string, agentName: string) => identityRequest("/api/identities", { display_name: displayName, agent_name: agentName }) as Promise<IdentityRuntime>,
   switch: (profileId: string) => identityRequest("/api/identities/switch", { profile_id: profileId }) as Promise<DemoState>,
 };
+
+export async function readOperationalMetrics(): Promise<OperationalMetrics> {
+  const response = await fetch(`${API}/api/runtime/metrics`, { cache: "no-store" });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail ?? "运行指标读取失败");
+  return data;
+}

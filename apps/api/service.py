@@ -452,6 +452,67 @@ class DemoService:
         items = [dict(row) | {"recoverable": bool(row["recoverable"])} for row in rows]
         return {"total": len(items), "items": items}
 
+    def operational_metrics(self) -> dict[str, Any]:
+        """Aggregate durable runtime health for the active local owner."""
+        with self._connect() as conn:
+            run_counts = {row["status"]: row["count"] for row in conn.execute(
+                "SELECT status, COUNT(*) AS count FROM task_runs GROUP BY status"
+            ).fetchall()}
+            job_counts = {row["status"]: row["count"] for row in conn.execute(
+                "SELECT status, COUNT(*) AS count FROM worker_jobs GROUP BY status"
+            ).fetchall()}
+            outbox_counts = {row["status"]: row["count"] for row in conn.execute(
+                "SELECT status, COUNT(*) AS count FROM action_outbox GROUP BY status"
+            ).fetchall()}
+            connector_rows = conn.execute("SELECT enabled, status FROM connector_registry").fetchall()
+            memories = conn.execute("SELECT COUNT(*) FROM memory_records").fetchone()[0]
+            receipts = conn.execute("SELECT COUNT(*) FROM action_receipts").fetchone()[0]
+            unread = conn.execute("SELECT COUNT(*) FROM notifications WHERE status = 'UNREAD'").fetchone()[0]
+            recovery_events = conn.execute(
+                "SELECT COUNT(*) FROM audit_events WHERE event_type IN ('job.retried', 'outbox.retried')"
+            ).fetchone()[0]
+            incident_rows = conn.execute(
+                """SELECT 'WORKER' AS source, job_id AS item_id, skill AS operation, status, error, updated_at
+                FROM worker_jobs WHERE status = 'FAILED'
+                UNION ALL
+                SELECT 'OUTBOX', outbox_id, action_id, status, error, updated_at
+                FROM action_outbox WHERE status = 'FAILED'
+                ORDER BY updated_at DESC LIMIT 10"""
+            ).fetchall()
+        terminal = sum(run_counts.get(status, 0) for status in ("COMPLETED", "FAILED", "CANCELLED"))
+        completed = run_counts.get("COMPLETED", 0)
+        enabled_connectors = [row for row in connector_rows if row["enabled"]]
+        healthy_connectors = sum(1 for row in enabled_connectors if row["status"] in {"HEALTHY", "UNKNOWN"})
+        degraded = len(enabled_connectors) - healthy_connectors
+        unresolved_outbox = outbox_counts.get("FAILED", 0)
+        failed_jobs = job_counts.get("FAILED", 0)
+        health = "CRITICAL" if unresolved_outbox or degraded else "ATTENTION" if failed_jobs else "HEALTHY"
+        return {
+            "health": health,
+            "generated_at": _iso(DEMO_NOW),
+            "runs": {
+                "total": sum(run_counts.values()), "active": run_counts.get("RUNNING", 0),
+                "paused": run_counts.get("PAUSED", 0), "completed": completed,
+                "failed": run_counts.get("FAILED", 0), "cancelled": run_counts.get("CANCELLED", 0),
+                "success_rate": round(completed / terminal * 100, 1) if terminal else 0.0,
+            },
+            "workers": {
+                "total": sum(job_counts.values()), "pending": job_counts.get("PENDING", 0),
+                "running": job_counts.get("RUNNING", 0), "failed": failed_jobs,
+                "succeeded": job_counts.get("SUCCEEDED", 0),
+            },
+            "actions": {
+                "total": sum(outbox_counts.values()), "pending": outbox_counts.get("PENDING", 0),
+                "running": outbox_counts.get("RUNNING", 0), "failed": unresolved_outbox,
+                "succeeded": outbox_counts.get("SUCCEEDED", 0), "receipts": receipts,
+            },
+            "connectors": {"enabled": len(enabled_connectors), "healthy": healthy_connectors, "degraded": degraded},
+            "memory_records": memories,
+            "unread_notifications": unread,
+            "recovery_events": recovery_events,
+            "incidents": [dict(row) for row in incident_rows],
+        }
+
     def switch_run(self, run_id: str) -> dict[str, Any]:
         current = self._get_state()
         if current is not None and current["run_id"] == run_id:

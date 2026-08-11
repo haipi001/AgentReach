@@ -404,6 +404,30 @@ def test_interrupted_outbox_action_is_recovered_after_restart(tmp_path: Path):
     assert item["error"] == "recovered_after_restart"
 
 
+def test_operational_metrics_aggregate_runs_queues_actions_and_incidents(service: DemoService):
+    state = advance_to_candidates(service)
+    service.select_candidate(state["candidates"][0]["id"])
+    service.approve_introduction()
+    service.peer_decision(True)
+    service.approve_and_verify_commitment()
+
+    healthy = service.operational_metrics()
+    assert healthy["health"] == "HEALTHY"
+    assert healthy["runs"]["completed"] == 1
+    assert healthy["runs"]["success_rate"] == 100.0
+    assert healthy["actions"] == {"total": 2, "pending": 0, "running": 0, "failed": 0, "succeeded": 2, "receipts": 2}
+    assert healthy["connectors"]["degraded"] == 0
+
+    service.reset()
+    service.enqueue_job("discovery-worker", "candidate-discovery")
+    service.process_next_job()
+    attention = service.operational_metrics()
+    assert attention["health"] == "ATTENTION"
+    assert attention["workers"]["failed"] == 1
+    assert attention["incidents"][0]["source"] == "WORKER"
+    assert attention["incidents"][0]["operation"] == "candidate-discovery"
+
+
 def test_persistent_notification_inbox_tracks_approval_and_result_lifecycle(service: DemoService):
     state = service.start_task("notify me through the loop")
     service.select_candidate_queued(state["candidates"][0]["id"])

@@ -2,14 +2,15 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import { demoApi, identityApi, memoryApi } from "@/lib/api";
+import { demoApi, identityApi, memoryApi, readOperationalMetrics } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent-store";
-import type { MemorySearchResult } from "@/types/agent";
+import type { MemorySearchResult, OperationalMetrics } from "@/types/agent";
 
-type SystemTab = "owner" | "runs" | "agents" | "skills" | "connectors" | "memory" | "policy";
+type SystemTab = "owner" | "observe" | "runs" | "agents" | "skills" | "connectors" | "memory" | "policy";
 
 const TAB_LABELS: { id: SystemTab; label: string }[] = [
   { id: "owner", label: "OWNER" },
+  { id: "observe", label: "OBSERVE" },
   { id: "runs", label: "RUNS" },
   { id: "agents", label: "AGENTS" },
   { id: "skills", label: "SKILLS" },
@@ -41,6 +42,8 @@ export function SystemPanel() {
   const [ownerName, setOwnerName] = useState("");
   const [agentName, setAgentName] = useState("");
   const [identityError, setIdentityError] = useState("");
+  const [metrics, setMetrics] = useState<OperationalMetrics | null>(null);
+  const [metricsBusy, setMetricsBusy] = useState(false);
 
   async function testBoundary() {
     if (testing) return;
@@ -58,6 +61,14 @@ export function SystemPanel() {
   async function chooseTab(nextTab: SystemTab) {
     setTab(nextTab);
     if (nextTab === "memory" && !memories) await searchMemory("");
+    if (nextTab === "observe" && !metrics) await refreshMetrics();
+  }
+
+  async function refreshMetrics() {
+    if (metricsBusy) return;
+    setMetricsBusy(true);
+    try { setMetrics(await readOperationalMetrics()); }
+    finally { setMetricsBusy(false); }
   }
 
   async function forget(memoryId: string) {
@@ -176,6 +187,8 @@ export function SystemPanel() {
 
       <div className="system-panel-body">
         {tab === "owner" && <section><div className="system-panel-heading"><span>LOCAL OWNER SESSION</span><b>{demo?.identity_runtime?.local_only ? "LOCAL ONLY" : "UNAVAILABLE"}</b></div><div className="owner-session"><span>ACTIVE SESSION</span><strong>{demo?.identity_runtime?.session_id ?? "LEGACY SESSION"}</strong><p>每个本地身份拥有独立的任务、Memory、Skill、Connector 和 Inbox 数据库。</p></div><div className="owner-profiles">{demo?.identity_runtime?.profiles.map((profile) => <article key={profile.profile_id} className={profile.active ? "active" : ""}><i/><div><strong>{profile.display_name}</strong><p>{profile.agent_name} / PERSONAL AGENT</p></div><small>{profile.active ? "CURRENT" : profile.profile_id}</small>{!profile.active && <button onClick={() => switchIdentity(profile.profile_id)} disabled={identityBusy}>切换</button>}</article>)}</div>{(demo?.identity_runtime?.profiles.length ?? 0) < 5 && <form className="owner-create" onSubmit={(event) => { event.preventDefault(); createIdentity(); }}><span>CREATE ISOLATED IDENTITY</span><input value={ownerName} onChange={(event) => setOwnerName(event.target.value)} placeholder="所有者名称" maxLength={40}/><input value={agentName} onChange={(event) => setAgentName(event.target.value)} placeholder="AI 名称" maxLength={40}/><button disabled={identityBusy || !ownerName.trim() || !agentName.trim()}>{identityBusy ? "创建中" : "创建本地身份"}</button></form>}{identityError && <p className="owner-error">{identityError}</p>}</section>}
+
+        {tab === "observe" && <section className="observe-panel"><div className="system-panel-heading"><span>OPERATIONAL HEALTH</span><b className={metrics?.health.toLowerCase()}>{metricsBusy ? "REFRESHING" : metrics?.health ?? "LOADING"}</b></div>{metrics && <><div className={`health-hero ${metrics.health.toLowerCase()}`}><div><span>ACTIVE OWNER HEALTH</span><strong>{metrics.health}</strong><p>{metrics.runs.total} RUNS · {metrics.workers.total} JOBS · {metrics.actions.total} ACTIONS</p></div><button onClick={refreshMetrics} disabled={metricsBusy}>刷新状态</button></div><div className="metric-grid"><article><span>RUN SUCCESS</span><strong>{metrics.runs.success_rate}%</strong><p>{metrics.runs.completed} completed · {metrics.runs.failed} failed · {metrics.runs.cancelled} cancelled</p></article><article><span>QUEUE DEPTH</span><strong>{metrics.workers.pending + metrics.workers.running}</strong><p>{metrics.workers.failed} failed jobs</p></article><article><span>ACTION RECEIPTS</span><strong>{metrics.actions.receipts}</strong><p>{metrics.actions.succeeded} outbox succeeded · {metrics.actions.failed} unresolved</p></article><article><span>CONNECTORS</span><strong>{metrics.connectors.healthy}/{metrics.connectors.enabled}</strong><p>{metrics.connectors.degraded} degraded</p></article><article><span>MEMORY</span><strong>{metrics.memory_records}</strong><p>verified records</p></article><article><span>RECOVERIES</span><strong>{metrics.recovery_events}</strong><p>{metrics.unread_notifications} unread signals</p></article></div><div className="incident-list"><h3>RECENT UNRESOLVED INCIDENTS <b>{metrics.incidents.length}</b></h3>{metrics.incidents.length ? metrics.incidents.map((incident) => <article key={`${incident.source}:${incident.item_id}`}><span>{incident.source}</span><div><strong>{incident.operation}</strong><p>{incident.error || "unknown failure"}</p></div><small>{incident.item_id}</small></article>) : <div className="incident-empty"><i>✓</i><strong>没有未解决的运行故障</strong><p>Worker Queue 与 Action Outbox 当前均无 FAILED 项。</p></div>}</div></>}</section>}
 
         {tab === "runs" && <section><div className="system-panel-heading"><span>MULTI-TASK RUNTIME</span><b>{demo?.runtime.status ?? "LOADING"}</b></div>{demo?.runtime && <><div className="run-hero"><div><span>CURRENT WORKSPACE</span><strong>{demo.human_request || "尚未输入任务"}</strong><p>{demo.stage} · ATTEMPT {demo.runtime.attempt} · {demo.runtime.run_id}</p></div><i className={demo.runtime.status.toLowerCase()}>{demo.runtime.status}</i></div><div className="run-controls"><button onClick={() => controlRun("pause")} disabled={runtimeBusy || !demo.runtime.controls.can_pause}>暂停</button><button onClick={() => controlRun("resume")} disabled={runtimeBusy || !demo.runtime.controls.can_resume}>恢复</button><button onClick={() => controlRun("cancel")} disabled={runtimeBusy || !demo.runtime.controls.can_cancel}>{confirmCancel ? "确认取消" : "取消"}</button><button onClick={() => controlRun("retry")} disabled={runtimeBusy || !demo.runtime.controls.can_retry}>重试</button></div><div className="run-history"><h3>任务工作区 <b>{demo.runtime.history.length}</b></h3>{demo.runtime.history.map((run) => { const terminal = ["COMPLETED", "CANCELLED", "FAILED", "SUPERSEDED"].includes(run.status); return <article key={run.run_id} className={run.run_id === demo.runtime.run_id ? "current" : ""}><span>{run.status}</span><div><strong>{run.human_request || "未命名任务"}</strong><p>{run.stage} · ATTEMPT {run.attempt}</p></div><small>{run.run_id}</small>{run.run_id !== demo.runtime.run_id && <button onClick={() => switchRun(run.run_id)} disabled={runtimeBusy || !run.recoverable}>{terminal ? "查看" : "切换"}</button>}</article>; })}</div></>}</section>}
 
