@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { useRef } from "react";
 
 const SYSTEMS = [
   { index: "01", zone: "HEAD", plane: "SELF", title: "Identity is embodied, not exposed.", copy: "The face, voice and name make the agent recognisable to you. They never become proof of authority and never widen access.", signals: ["IDENTITY / LOCAL", "FACE / USER OWNED", "VOICE / REVOCABLE", "MASK / OPTIONAL", "NAME / HAIPI", "EXPORT / LOCKED"] },
@@ -13,15 +14,22 @@ const SYSTEMS = [
 
 export function CapabilityAtlas() {
   const reduceMotion = useReducedMotion();
+  const track = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
+  const x = useTransform(scrollYProgress, [0, 1], ["0vw", "-290vw"]);
   return <section className="capability-atlas" aria-labelledby="atlas-title">
-    <header className="atlas-intro"><span>ANATOMY OF A PERSONAL AGENT</span><h2 id="atlas-title">One body.<br/><em>Five trust systems.</em></h2><p>Scroll through the body to see where appearance ends, agency begins, and proof returns.</p></header>
-    <div className="atlas-grid">
-      <figure className="atlas-body" aria-hidden="true"><div className="atlas-body-glow"/><Image className="atlas-base" src="/images/agentreach-base-body-v1.png" width={943} height={1676} alt="" sizes="(max-width: 820px) 86vw, 42vw"/><Image className="atlas-armor" src="/images/agentreach-armor-overlay-v1.png" width={943} height={1676} alt="" sizes="(max-width: 820px) 86vw, 42vw"/></figure>
-      <div className="atlas-systems">{SYSTEMS.map((system) => <motion.article key={system.index} className="atlas-system" initial={false} whileInView={reduceMotion ? undefined : { y: [28, 0] }} viewport={{ amount: .32 }} transition={{ duration: .7, ease: [0.22, 1, 0.36, 1] }}>
+    <header className="atlas-intro"><span>ANATOMY OF A PERSONAL AGENT / 003</span><h2 id="atlas-title">One presence.<br/><em>Five trust systems.</em></h2><p>Every part is a bounded capability—not an upgrade slot, and never a hidden permission.</p></header>
+    <div ref={track} className="atlas-horizontal-track">
+      <div className="atlas-sticky">
+        <div className="atlas-title-rail"><span>SYSTEM MAP</span><b>01—05</b></div>
+        <figure className="atlas-body" aria-hidden="true"><div className="atlas-body-glow"/><Image className="atlas-base" src="/images/agentreach-base-body-v1.png" width={943} height={1676} alt="" sizes="(max-width: 820px) 86vw, 36vw"/><Image className="atlas-armor" src="/images/agentreach-armor-overlay-v1.png" width={943} height={1676} alt="" sizes="(max-width: 820px) 86vw, 36vw"/><figcaption>SELF / LOCAL BODY</figcaption></figure>
+        <motion.div className="atlas-systems" style={reduceMotion ? undefined : { x }}>{SYSTEMS.map((system) => <motion.article key={system.index} className="atlas-system">
         <div className="system-meta"><b>{system.index}</b><span>{system.zone}</span><i>{system.plane}</i></div>
         <h3>{system.title}</h3><p>{system.copy}</p>
         <div className="system-signals">{system.signals.map((signal) => <span key={signal}>{signal}</span>)}</div>
-      </motion.article>)}</div>
+      </motion.article>)}</motion.div>
+        <motion.div className="atlas-progress" style={{ scaleX: scrollYProgress }} />
+      </div>
     </div>
   </section>;
 }
