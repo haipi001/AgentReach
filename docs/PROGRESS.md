@@ -9,9 +9,9 @@ Updated: 2026-08-11
 | World Action Gate | Complete | 100% | Repository write, Alice Inbox delivery, independent verification | Real GitHub OAuth connector |
 | Verified memory loop | Complete | 100% | Verified-only experience record and trace evidence | Retrieval and consolidation policies |
 | Spatial Self Space | Complete | 100% | R3F avatar, orbit navigation, Reach and evidence scenes | Accessibility and performance budget |
-| Spatial atmosphere | In progress | 80% | Unicorn Studio scene, lazy production CDN, reduced-motion pause, R3F foreground isolation | Variable manifest mapping and measured GPU budget |
+| Spatial atmosphere | In progress | 90% | Faceless torso BASE, independent MASK/ARMOR layers, local R3F light field, long-scroll system anatomy | Measured GPU budget and finer scroll choreography |
 | Persona Studio | In progress | 85% | Face shape, skin, eyes, hair, local GLB import, local persistence | Morph-target binding and exportable profiles |
-| Human avatar v2 | In progress | 70% | Anatomical fallback, facial features, session-only rigged GLB renderer | Licensed SMPL-X or authored high-fidelity asset and animation rig |
+| Human avatar v2 | In progress | 82% | Faceless identity vessel, detached capability armor, session-only rigged GLB renderer, procedural model removed from primary stage | Licensed SMPL-X or authored high-fidelity asset and animation rig |
 | Connector plane | In progress | 45% | Local GitHub sandbox, durable mailbox, scoped grants, persistent idempotency receipts | OAuth, revocation, retries |
 | Multi-agent runtime | Planned | 15% | Manager and worker boundaries exist as deterministic services | Separate worker processes and queues |
 | Trust domain deployment | Planned | 10% | Claims and boundary contracts exist | PostgreSQL, domain service, deployment manifests |

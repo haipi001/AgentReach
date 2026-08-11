@@ -29,9 +29,6 @@ importers:
       three:
         specifier: ^0.181.1
         version: 0.181.1
-      unicornstudio-react:
-        specifier: 2.2.8
-        version: 2.2.8(next@15.5.23(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       zustand:
         specifier: ^5.0.8
         version: 5.0.14(@types/react@19.2.18)(react@19.2.8)(use-sync-external-store@1.4.0(react@19.2.8))
@@ -654,17 +651,6 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
-  unicornstudio-react@2.2.8:
-    resolution: {integrity: sha512-XDO4FJUtRlrAJyVDw01qK7+wRWiRwqMfi+moAvYnGxKgnkcXQNpSgilVtJC+dYrOIyKpEOfmwxChaQpYXXwjWg==}
-    engines: {node: '>=20.0.0'}
-    peerDependencies:
-      next: '*'
-      react: '>=18.0.0'
-      react-dom: '>=18.0.0'
-    peerDependenciesMeta:
-      next:
-        optional: true
-
   use-sync-external-store@1.2.0:
     resolution: {integrity: sha512-eEgnFxGQ1Ife9bzYs6VLi8/4X6CObHMw9Qr9tPY43iKwsPw8xE8+EFsf/2cFZ5S3esXgpWgtSCtLNS41F+sKPA==}
     peerDependencies:
@@ -1235,13 +1221,6 @@ snapshots:
   typescript@5.9.3: {}
 
   undici-types@6.21.0: {}
-
-  unicornstudio-react@2.2.8(next@15.5.23(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
-    dependencies:
-      react: 19.2.8
-      react-dom: 19.2.8(react@19.2.8)
-    optionalDependencies:
-      next: 15.5.23(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 
   use-sync-external-store@1.2.0(react@19.2.8):
     dependencies:

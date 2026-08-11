@@ -6,7 +6,6 @@ import { Component, Suspense, useRef, type ReactNode } from "react";
 import type { Group } from "three";
 import type { AgentState } from "@/types/agent";
 import type { PersonaConfig } from "@/types/agent";
-import { RealisticHuman } from "@/components/avatar/RealisticHuman";
 import { ImportedHuman } from "@/components/avatar/ImportedHuman";
 import { useAgentStore } from "@/stores/agent-store";
 
@@ -45,8 +44,8 @@ export function AgentAvatar({ state, persona }: { state: AgentState; persona: Pe
     <Float speed={1.1} rotationIntensity={0.08} floatIntensity={0.28}>
       <group ref={group} position={[0, -0.12, 0]} scale={0.5}>
         {persona.form === "human" && (avatarAsset
-          ? <AvatarAssetBoundary key={avatarAsset.url} fallback={<RealisticHuman persona={persona} />}><Suspense fallback={<RealisticHuman persona={persona} />}><ImportedHuman url={avatarAsset.url} /></Suspense></AvatarAssetBoundary>
-          : <RealisticHuman persona={persona} />)}
+          ? <AvatarAssetBoundary key={avatarAsset.url} fallback={null}><Suspense fallback={null}><ImportedHuman url={avatarAsset.url} /></Suspense></AvatarAssetBoundary>
+          : null)}
         {persona.form === "monolith" && <>
           <mesh position={[0, 1.28, 0]} castShadow><sphereGeometry args={[0.36, 64, 64]} /><meshPhysicalMaterial color={stateColors[state]} {...finishProps[persona.finish]} /></mesh>
           <mesh position={[0, 0.18, 0]} castShadow><capsuleGeometry args={[0.52, 1.2, 14, 48]} /><meshPhysicalMaterial color="#171719" {...finishProps[persona.finish]} /></mesh>

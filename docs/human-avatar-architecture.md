@@ -16,7 +16,7 @@ The person begins from SELF. AGENCY mediates every transition into WORLD. Only i
 
 | Layer | Responsibility | Runtime | Status |
 | --- | --- | --- | --- |
-| Web renderer | Local GLB rendering, procedural fallback, face controls | Browser | Implemented |
+| Web renderer | Faceless BASE, detached MASK/ARMOR layers, local GLB rendering | Browser | Implemented |
 | Avatar profile | Portable appearance and privacy contract | Local JSON | Implemented |
 | MMHuman3D / SMPL-X | Body shape, pose parameters, mesh recovery | Optional local GPU service | Planned |
 | MMPose | Body, hand, and face landmark estimation | Optional local GPU service | Planned |
@@ -32,7 +32,7 @@ The person begins from SELF. AGENCY mediates every transition into WORLD. Only i
 
 ## High-fidelity model contract
 
-The browser accepts a local rigged GLB for a high-fidelity body. The object URL is transient and is not included in persisted Zustand state. Procedural geometry remains a reliable offline fallback.
+The browser accepts a local rigged GLB for a high-fidelity body. The object URL is transient and is not included in persisted Zustand state. Without a qualified model, the product shows a cropped faceless BASE while MASK and ARMOR remain visibly detached interface layers. This keeps identity, capability and authority legible as separate systems.
 
 The next rendering gate is a morph-target adapter for licensed GLB or VRM assets. It will map the portable avatar profile to named facial morphs without coupling face appearance to identity or permissions.
 
@@ -50,4 +50,3 @@ The next rendering gate is a morph-target adapter for licensed GLB or VRM assets
 - [MMPose](https://github.com/open-mmlab/mmpose)
 - [PhotoMaker](https://github.com/TencentARC/PhotoMaker)
 - [CharacterGLM-6B](https://huggingface.co/thu-coai/CharacterGLM-6B)
-
