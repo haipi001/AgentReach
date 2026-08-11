@@ -1,0 +1,18 @@
+{
+  "generated_for": "AgentReach synthetic demo",
+  "as_of": "2026-08-10T09:00:00+08:00",
+  "domain": {"id": "706", "name": "706 Community"},
+  "people": [
+    {"id":"haipi","agent":"haipi-agent","display_name":"Haipi","availability":"available","claims":[{"id":"claim-haipi-1","type":"interest","topics":["personal-agent","human-agent-social-protocol"],"audience":["domain:706"],"issued_at":"2026-08-09T09:00:00+08:00","expires_at":"2026-09-09T09:00:00+08:00","provenance":"human_confirmed"}]},
+    {"id":"alice","agent":"alice-agent","display_name":"Alice","availability":"available","claims":[{"id":"claim-alice-1","type":"interest","topics":["agent-identity","personal-agent"],"audience":["domain:706"],"issued_at":"2026-08-07T09:00:00+08:00","expires_at":"2026-09-07T09:00:00+08:00","provenance":"human_confirmed"}]},
+    {"id":"bob","agent":"bob-agent","display_name":"Bob","availability":"limited","claims":[{"id":"claim-bob-1","type":"capability","topics":["personal-agent","multi-agent","mcp"],"audience":["domain:706"],"issued_at":"2026-08-05T09:00:00+08:00","expires_at":"2026-09-05T09:00:00+08:00","provenance":"human_confirmed"}]},
+    {"id":"carol","agent":"carol-agent","display_name":"Carol","availability":"available","claims":[{"id":"claim-carol-1","type":"interest","topics":["personal-agent","privacy"],"audience":["domain:706"],"issued_at":"2026-07-20T09:00:00+08:00","expires_at":"2026-08-20T09:00:00+08:00","provenance":"human_confirmed"}]},
+    {"id":"david","agent":"david-agent","display_name":"David","availability":"available","claims":[{"id":"claim-david-1","type":"interest","topics":["blockchain","dao"],"audience":["domain:706"],"issued_at":"2026-06-01T09:00:00+08:00","expires_at":"2026-07-01T09:00:00+08:00","provenance":"human_confirmed"}]}
+  ],
+  "private_relationships": [
+    {"owner_id":"haipi","person_id":"alice","relationship_type":"past_collaborator","shared_topics":["agent-identity"],"shared_projects":["706 research salon"],"last_interaction_at":"2026-05-01T09:00:00+08:00","source":"human_confirmed","user_notes":"Private demo note; never leaves personal plane."},
+    {"owner_id":"haipi","person_id":"bob","relationship_type":"acquaintance","shared_topics":["mcp"],"shared_projects":[],"last_interaction_at":"2025-12-10T09:00:00+08:00","source":"human_confirmed","user_notes":"Private demo note; never leaves personal plane."},
+    {"owner_id":"haipi","person_id":"carol","relationship_type":"domain_peer","shared_topics":["privacy"],"shared_projects":[],"last_interaction_at":"2026-01-15T09:00:00+08:00","source":"human_confirmed","user_notes":"Private demo note; never leaves personal plane."},
+    {"owner_id":"alice","person_id":"haipi","relationship_type":"domain_peer","shared_topics":["agent-identity"],"shared_projects":[],"last_interaction_at":"2026-05-01T09:00:00+08:00","source":"human_confirmed","user_notes":"Directional and distinct from Haipi's record."}
+  ]
+}

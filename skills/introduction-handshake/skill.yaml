@@ -1,0 +1,8 @@
+name: introduction-handshake
+version: 0.1.0
+input_schemas: [../../protocol/capsule/schema.json, ../../protocol/introduction/schema.json]
+output_schema: ../../protocol/introduction/schema.json
+tools: [personal.approval_get, mailbox.send_message, mailbox.get_messages, mailbox.ack_message, audit.record_event]
+side_effect: external_write
+approval: L2_sender_and_peer
+failures: [approval_missing, capsule_expired, capsule_invalid, peer_rejected, delivery_failed, replay_detected]

@@ -1,0 +1,51 @@
+version: 0.1.0
+personal_agent_identity: haipi-agent
+agents:
+  - name: personal-manager
+    role: Orchestrate the task state machine and delegate bounded work.
+    capabilities: [route_tasks, maintain_state, request_approval]
+    inputs: [task_state, worker_results]
+    outputs: [next_task_state, worker_assignment]
+    dependencies: [audit]
+    decision_boundary: Cannot modify private facts, execute outbound actions, or bypass approval.
+    trace: [state_transition, worker_assignment]
+  - name: intent-worker
+    role: Structure a human request as a private Intent.
+    capabilities: [parse_intent, normalize_constraints]
+    inputs: [human_request, private_context]
+    outputs: [intent]
+    dependencies: [intent-structuring, personal]
+    decision_boundary: Cannot publish intent or contact external agents.
+    trace: [intent_created, assumptions]
+  - name: discovery-worker
+    role: Find and rank eligible candidates from shared claims and local relationship context.
+    capabilities: [hard_filter, score_candidates, explain_ranking]
+    inputs: [intent, shared_claims, local_relationships]
+    outputs: [ranked_candidates]
+    dependencies: [candidate-discovery, personal, trust-domain]
+    decision_boundary: Cannot read remote private data or initiate contact.
+    trace: [filters, score_components, evidence_ids]
+  - name: boundary-worker
+    role: Build minimum-sufficient outbound context and enforce disclosure policy.
+    capabilities: [redact, classify_risk, prepare_capsule, deny]
+    inputs: [intent, candidate, private_context, disclosure_policy]
+    outputs: [capsule_draft, removed_fields, approval_required, decision]
+    dependencies: [context-capsule, personal, audit]
+    decision_boundary: Cannot weaken policy or approve its own capsule.
+    trace: [requested_fields, removed_fields, policy_decision]
+  - name: collaboration-worker
+    role: Execute approved introduction and commitment handshakes.
+    capabilities: [send_introduction, process_response, propose_commitment]
+    inputs: [approved_capsule, peer_response, approvals]
+    outputs: [introduction, commitment_proposal]
+    dependencies: [introduction-handshake, mailbox, audit]
+    decision_boundary: Cannot send without L2 approval or accept an L3 commitment for a human.
+    trace: [mailbox_event, approval_reference, protocol_transition]
+  - name: verifier-worker
+    role: Independently verify immutable collaboration evidence.
+    capabilities: [validate_schema, validate_expiry, validate_approvals, validate_trace]
+    inputs: [introduction, capsule, commitment, approvals, trace]
+    outputs: [verification_report]
+    dependencies: [commitment-verification, audit]
+    decision_boundary: Read-only; cannot modify execution evidence or self-verify executor output without source evidence.
+    trace: [checks, failures, verdict]

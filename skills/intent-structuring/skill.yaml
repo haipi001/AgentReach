@@ -1,0 +1,8 @@
+name: intent-structuring
+version: 0.1.0
+input_schema: ../../protocol/intent/schema.json#request
+output_schema: ../../protocol/intent/schema.json
+tools: [personal.intent_create, audit.record_event]
+side_effect: local_write
+approval: none
+failures: [insufficient_context, unsupported_intent, invalid_scope]

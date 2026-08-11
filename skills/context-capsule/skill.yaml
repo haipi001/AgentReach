@@ -1,0 +1,9 @@
+name: context-capsule
+version: 0.1.0
+inputs: [intent, target, personal_context, disclosure_policy, purpose, expires_at]
+outputs: [capsule_draft, included_fields, removed_fields, risk_level, approval_required, decision]
+tools: [personal.relationship_search, personal.policy_check, personal.approval_create, audit.record_event]
+side_effect: local_write
+approval: required_before_external_use
+forbidden: [personal.memory_export, personal.relationship_graph_export, policy_override]
+failures: [insufficient_context, policy_conflict, invalid_recipient, scope_exceeds_delegation]

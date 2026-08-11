@@ -1,0 +1,30 @@
+{
+  "name": "agentreach-spatial-web",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 3000",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 3000",
+    "lint": "tsc --noEmit",
+    "test:e2e": "node scripts/spatial-e2e.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.4",
+    "@react-three/fiber": "^9.4.0",
+    "motion": "^12.23.24",
+    "next": "^15.5.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "three": "^0.181.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@types/three": "^0.181.0",
+    "playwright-core": "^1.62.1",
+    "typescript": "^5.9.3"
+  }
+}

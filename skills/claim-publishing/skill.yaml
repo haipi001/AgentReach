@@ -1,0 +1,8 @@
+name: claim-publishing
+version: 0.1.0
+input_schema: ../../protocol/claim/schema.json
+outputs: [claim_id, receipt, audit_event_id]
+tools: [personal.policy_check, personal.approval_get, trust_domain.publish_claim, trust_domain.revoke_claim, audit.record_event]
+side_effect: external_write
+approval: L2
+failures: [approval_missing, invalid_audience, invalid_expiry, policy_blocked, publish_failed]

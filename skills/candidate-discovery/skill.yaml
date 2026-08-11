@@ -1,0 +1,8 @@
+name: candidate-discovery
+version: 0.1.0
+inputs: [intent, shared_claims, local_relationships, as_of]
+outputs: [ranked_candidates, score_components, evidence_ids, explanations]
+tools: [trust_domain.search_claims, trust_domain.get_presence, personal.relationship_search, audit.record_event]
+side_effect: none
+approval: none
+failures: [no_match, stale_claims, tool_unavailable]

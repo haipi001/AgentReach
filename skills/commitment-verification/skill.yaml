@@ -1,0 +1,8 @@
+name: commitment-verification
+version: 0.1.0
+input_schemas: [../../protocol/capsule/schema.json, ../../protocol/introduction/schema.json, ../../protocol/commitment/schema.json]
+outputs: [verdict, checks, evidence_ids, failure_reasons]
+tools: [audit.get_trace]
+side_effect: none
+approval: none
+failures: [approval_mismatch, capsule_expired, protocol_invalid, commitment_inconsistent, trace_incomplete, evidence_mutated]
