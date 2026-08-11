@@ -77,8 +77,21 @@ class DemoService:
         self.repo_root = self.world_root / "github" / "agentreach"
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
-        if self._get_state() is None:
+        existing = self._get_state()
+        if existing is None:
             self.reset()
+        elif "run_id" not in existing:
+            existing.update(
+                {
+                    "run_id": f"run-{uuid4().hex[:8]}",
+                    "runtime_status": "COMPLETED" if existing.get("stage") == "COMPLETED" else "RUNNING",
+                    "attempt": 1,
+                    "created_at": _iso(DEMO_NOW),
+                    "updated_at": _iso(DEMO_NOW),
+                    "finished_at": _iso(DEMO_NOW) if existing.get("stage") == "COMPLETED" else None,
+                }
+            )
+            self._save_state(existing)
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
@@ -129,6 +142,18 @@ class DemoService:
                     result TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS task_runs (
+                    run_id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    trace_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    stage TEXT NOT NULL,
+                    attempt INTEGER NOT NULL,
+                    human_request TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    finished_at TEXT
+                );
                 """
             )
 
@@ -138,10 +163,26 @@ class DemoService:
         return json.loads(row["payload"]) if row else None
 
     def _save_state(self, state: dict[str, Any]) -> None:
+        state["updated_at"] = _iso(DEMO_NOW + timedelta(seconds=self._trace_count(state)))
         with self._connect() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO demo_state(id, payload, updated_at) VALUES(1, ?, ?)",
                 (json.dumps(state, ensure_ascii=False), _iso(DEMO_NOW)),
+            )
+            conn.execute(
+                """INSERT INTO task_runs
+                (run_id, task_id, trace_id, status, stage, attempt, human_request, created_at, updated_at, finished_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    status=excluded.status, stage=excluded.stage, attempt=excluded.attempt,
+                    human_request=excluded.human_request, updated_at=excluded.updated_at,
+                    finished_at=excluded.finished_at""",
+                (
+                    state["run_id"], state["task_id"], state["trace_id"],
+                    state["runtime_status"], state["stage"], state["attempt"],
+                    state.get("human_request"), state["created_at"], state["updated_at"],
+                    state.get("finished_at"),
+                ),
             )
 
     def _event(
@@ -179,6 +220,8 @@ class DemoService:
 
     def _require(self, *stages: str) -> dict[str, Any]:
         state = self._get_state()
+        if state is not None and state.get("runtime_status", "RUNNING") != "RUNNING":
+            raise DemoError(f"当前运行状态 {state['runtime_status']} 不允许执行任务步骤。")
         if state is None or state["stage"] not in stages:
             actual = state["stage"] if state else "MISSING"
             raise DemoError(f"当前状态 {actual} 不能执行此操作；需要 {' / '.join(stages)}。")
@@ -192,12 +235,23 @@ class DemoService:
         return [error.message for error in sorted(validator.iter_errors(payload), key=lambda e: list(e.path))]
 
     def reset(self) -> dict[str, Any]:
+        previous = self._get_state()
+        if previous and previous.get("runtime_status") not in {"COMPLETED", "CANCELLED", "FAILED", "SUPERSEDED"}:
+            previous["runtime_status"] = "SUPERSEDED"
+            previous["finished_at"] = _iso(DEMO_NOW)
+            self._save_state(previous)
         state = {
+            "run_id": f"run-{uuid4().hex[:8]}",
             "task_id": f"task-{uuid4().hex[:8]}",
             "trace_id": f"trace-{uuid4().hex[:8]}",
             "principal_id": "haipi",
             "personal_agent_id": "haipi-agent",
             "stage": "CREATED",
+            "runtime_status": "RUNNING",
+            "attempt": 1,
+            "created_at": _iso(DEMO_NOW),
+            "updated_at": _iso(DEMO_NOW),
+            "finished_at": None,
             "intent": None,
             "candidates": [],
             "selected_candidate": None,
@@ -217,10 +271,6 @@ class DemoService:
             "world_changed": False,
             "connector_grants": [],
         }
-        with self._connect() as conn:
-            conn.execute("DELETE FROM audit_events")
-            conn.execute("DELETE FROM mailbox_envelopes")
-            conn.execute("DELETE FROM action_receipts")
         self._save_state(state)
         self._event(
             state,
@@ -232,6 +282,60 @@ class DemoService:
             {"task_id": state["task_id"], "initial_stage": "CREATED"},
         )
         return self.snapshot()
+
+    def pause_run(self) -> dict[str, Any]:
+        state = self._require(*STAGE_ORDER, "PEER_REJECTED", "FAILED")
+        if state["stage"] in {"COMPLETED", "PEER_REJECTED", "FAILED"}:
+            raise DemoError("已结束的任务不能暂停。")
+        state["runtime_status"] = "PAUSED"
+        self._event(state, "personal-manager", "task-orchestration", "run.paused", "PAUSED", "用户暂停当前任务；任何 Agent 均不得继续执行。", {"stage": state["stage"]})
+        self._save_state(state)
+        return self.snapshot()
+
+    def resume_run(self) -> dict[str, Any]:
+        state = self._get_state()
+        if state is None or state.get("runtime_status") != "PAUSED":
+            raise DemoError("只有已暂停的任务可以恢复。")
+        state["runtime_status"] = "RUNNING"
+        self._event(state, "personal-manager", "task-orchestration", "run.resumed", "RESUMED", "用户恢复当前任务；从持久化阶段继续。", {"stage": state["stage"]})
+        self._save_state(state)
+        return self.snapshot()
+
+    def cancel_run(self) -> dict[str, Any]:
+        state = self._get_state()
+        if state is None or state.get("runtime_status") not in {"RUNNING", "PAUSED"}:
+            raise DemoError("当前任务不能取消。")
+        state["runtime_status"] = "CANCELLED"
+        state["finished_at"] = _iso(DEMO_NOW + timedelta(seconds=self._trace_count(state)))
+        self._event(state, "personal-manager", "task-orchestration", "run.cancelled", "CANCELLED", "用户取消当前任务；已发放但未使用的授权立即失效。", {"stage": state["stage"]})
+        for grant in state["connector_grants"]:
+            if grant["status"] != "USED":
+                grant["status"] = "REVOKED"
+        self._save_state(state)
+        return self.snapshot()
+
+    def retry_run(self) -> dict[str, Any]:
+        previous = self._get_state()
+        if previous is None or previous.get("runtime_status") not in {"CANCELLED", "FAILED"}:
+            raise DemoError("只有已取消或失败的任务可以重试。")
+        request = previous.get("human_request", "")
+        attempt = int(previous.get("attempt", 1)) + 1
+        result = self.reset()
+        state = self._get_state()
+        assert state is not None
+        state["attempt"] = attempt
+        state["retried_from"] = previous["run_id"]
+        self._save_state(state)
+        if request:
+            self.structure_intent(request)
+            return self.discover()
+        return self.snapshot()
+
+    def list_runs(self) -> dict[str, Any]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM task_runs ORDER BY rowid DESC LIMIT 30").fetchall()
+        items = [dict(row) for row in rows]
+        return {"total": len(items), "items": items}
 
     def structure_intent(self, request: str) -> dict[str, Any]:
         state = self._require("CREATED")
@@ -448,6 +552,8 @@ class DemoService:
         if not accepted:
             state["introduction"]["state"] = "declined"
             state["stage"] = "PEER_REJECTED"
+            state["runtime_status"] = "FAILED"
+            state["finished_at"] = _iso(DEMO_NOW + timedelta(minutes=2))
             self._save_state(state)
             self._event(
                 state,
@@ -519,6 +625,8 @@ class DemoService:
             "read_only": True,
         }
         state["stage"] = "COMPLETED" if passed else "FAILED"
+        state["runtime_status"] = "COMPLETED" if passed else "FAILED"
+        state["finished_at"] = _iso(DEMO_NOW + timedelta(minutes=5))
         self._save_state(state)
         self._event(
             state,
@@ -778,6 +886,22 @@ class DemoService:
         ]
         result["stage_index"] = STAGE_ORDER.index(state["stage"]) if state["stage"] in STAGE_ORDER else -1
         result["stage_total"] = len(STAGE_ORDER) - 1
+        run_list = self.list_runs()
+        result["runtime"] = {
+            "run_id": state["run_id"],
+            "status": state["runtime_status"],
+            "attempt": state["attempt"],
+            "created_at": state["created_at"],
+            "updated_at": state["updated_at"],
+            "finished_at": state.get("finished_at"),
+            "controls": {
+                "can_pause": state["runtime_status"] == "RUNNING" and state["stage"] not in {"COMPLETED", "FAILED", "PEER_REJECTED"},
+                "can_resume": state["runtime_status"] == "PAUSED",
+                "can_cancel": state["runtime_status"] in {"RUNNING", "PAUSED"} and state["stage"] not in {"COMPLETED", "FAILED", "PEER_REJECTED"},
+                "can_retry": state["runtime_status"] in {"CANCELLED", "FAILED"},
+            },
+            "history": run_list["items"],
+        }
         result["privacy_invariants"] = [
             "Private Intent stays local",
             "Relationship graph never enters shared plane",

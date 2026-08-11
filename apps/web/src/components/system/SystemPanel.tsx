@@ -6,9 +6,10 @@ import { demoApi, memoryApi } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent-store";
 import type { MemorySearchResult } from "@/types/agent";
 
-type SystemTab = "agents" | "skills" | "connectors" | "memory" | "policy";
+type SystemTab = "runs" | "agents" | "skills" | "connectors" | "memory" | "policy";
 
 const TAB_LABELS: { id: SystemTab; label: string }[] = [
+  { id: "runs", label: "RUNS" },
   { id: "agents", label: "AGENTS" },
   { id: "skills", label: "SKILLS" },
   { id: "connectors", label: "CONNECTORS" },
@@ -21,12 +22,14 @@ export function SystemPanel() {
   const setOpen = useAgentStore((state) => state.setSystemPanelOpen);
   const demo = useAgentStore((state) => state.demo);
   const setDemo = useAgentStore((state) => state.setDemo);
-  const [tab, setTab] = useState<SystemTab>("agents");
+  const [tab, setTab] = useState<SystemTab>("runs");
   const [testing, setTesting] = useState(false);
   const [memoryQuery, setMemoryQuery] = useState("");
   const [memories, setMemories] = useState<MemorySearchResult | null>(null);
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [confirmForget, setConfirmForget] = useState<string | null>(null);
+  const [runtimeBusy, setRuntimeBusy] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   async function testBoundary() {
     if (testing) return;
@@ -56,6 +59,20 @@ export function SystemPanel() {
     } finally { setMemoryBusy(false); }
   }
 
+  async function controlRun(action: "pause" | "resume" | "cancel" | "retry") {
+    if (runtimeBusy) return;
+    if (action === "cancel" && !confirmCancel) { setConfirmCancel(true); return; }
+    setRuntimeBusy(true);
+    try {
+      const next = action === "pause" ? await demoApi.pauseRun()
+        : action === "resume" ? await demoApi.resumeRun()
+        : action === "cancel" ? await demoApi.cancelRun()
+        : await demoApi.retryRun();
+      setDemo(next);
+      setConfirmCancel(false);
+    } finally { setRuntimeBusy(false); }
+  }
+
   return <AnimatePresence>{open && <>
     <motion.button className="system-scrim" aria-label="关闭系统控制面" onClick={() => setOpen(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}/>
     <motion.aside className="system-panel" aria-label="AgentReach 系统控制面" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 260, damping: 30 }}>
@@ -63,6 +80,8 @@ export function SystemPanel() {
       <nav aria-label="系统控制面分类">{TAB_LABELS.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => chooseTab(item.id)}>{item.label}</button>)}</nav>
 
       <div className="system-panel-body">
+        {tab === "runs" && <section><div className="system-panel-heading"><span>DURABLE TASK RUNTIME</span><b>{demo?.runtime.status ?? "LOADING"}</b></div>{demo?.runtime && <><div className="run-hero"><div><span>CURRENT RUN</span><strong>{demo.runtime.run_id}</strong><p>{demo.stage} · ATTEMPT {demo.runtime.attempt}</p></div><i className={demo.runtime.status.toLowerCase()}>{demo.runtime.status}</i></div><div className="run-controls"><button onClick={() => controlRun("pause")} disabled={runtimeBusy || !demo.runtime.controls.can_pause}>暂停</button><button onClick={() => controlRun("resume")} disabled={runtimeBusy || !demo.runtime.controls.can_resume}>恢复</button><button onClick={() => controlRun("cancel")} disabled={runtimeBusy || !demo.runtime.controls.can_cancel}>{confirmCancel ? "确认取消" : "取消"}</button><button onClick={() => controlRun("retry")} disabled={runtimeBusy || !demo.runtime.controls.can_retry}>重试</button></div><div className="run-history"><h3>持久运行记录 <b>{demo.runtime.history.length}</b></h3>{demo.runtime.history.map((run) => <article key={run.run_id} className={run.run_id === demo.runtime.run_id ? "current" : ""}><span>{run.status}</span><div><strong>{run.run_id}</strong><p>{run.stage} · ATTEMPT {run.attempt}</p></div><small>{run.trace_id}</small></article>)}</div></>}</section>}
+
         {tab === "agents" && <section><div className="system-panel-heading"><span>AGENT RUNTIME</span><b>{demo?.agents.length ?? 0} REGISTERED</b></div><div className="runtime-list">{demo?.agents.map((agent, index) => <article key={agent.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{agent.name}</strong><p>{agent.role}</p></div><aside><i className={agent.status === "ACTIVE" ? "active" : ""}/><b>{agent.status}</b><small>{agent.events} EVENTS</small></aside></article>)}</div></section>}
 
         {tab === "skills" && <section><div className="system-panel-heading"><span>SKILL REGISTRY</span><b>VERSIONED CONTRACTS</b></div><div className="skill-matrix">{demo?.skills.map((skill) => <article key={skill.id}><header><span>{skill.id}</span><b>v{skill.version}</b></header><p>{skill.description}</p><footer><span>{skill.status}</span><b>{skill.invocations} INVOCATIONS</b></footer></article>)}</div></section>}

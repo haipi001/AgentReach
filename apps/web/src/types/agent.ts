@@ -96,4 +96,30 @@ export type DemoState = {
     storage: string;
     survives_task_reset: boolean;
   };
+  runtime: {
+    run_id: string;
+    status: "RUNNING" | "PAUSED" | "CANCELLED" | "FAILED" | "COMPLETED" | "SUPERSEDED";
+    attempt: number;
+    created_at: string;
+    updated_at: string;
+    finished_at: string | null;
+    controls: {
+      can_pause: boolean;
+      can_resume: boolean;
+      can_cancel: boolean;
+      can_retry: boolean;
+    };
+    history: {
+      run_id: string;
+      task_id: string;
+      trace_id: string;
+      status: string;
+      stage: string;
+      attempt: number;
+      human_request: string | null;
+      created_at: string;
+      updated_at: string;
+      finished_at: string | null;
+    }[];
+  };
 };

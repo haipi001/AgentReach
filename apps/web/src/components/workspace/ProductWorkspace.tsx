@@ -75,7 +75,7 @@ export function ProductWorkspace() {
   return <section className="product-workspace" aria-label="AgentReach 操作台">
     <header className="workspace-header">
       <div><span className="eyebrow">PERSONAL AGENT CONTROL SURFACE</span><h1>让私人意图抵达世界，<em>但不离开你的边界。</em></h1></div>
-      <div className="workspace-health"><i/><span>LOCAL RUNTIME</span><b>{demo?.stage ?? "LOADING"}</b></div>
+      <div className={`workspace-health runtime-${demo?.runtime.status.toLowerCase() ?? "loading"}`}><i/><span>{demo?.runtime.status ?? "LOCAL RUNTIME"}</span><b>{demo?.stage ?? "LOADING"}</b></div>
     </header>
 
     <div className="workspace-grid">

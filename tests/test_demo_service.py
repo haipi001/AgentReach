@@ -129,3 +129,38 @@ def test_verified_memory_survives_task_reset_and_can_be_forgotten(service: DemoS
     forgotten = service.forget_memory(memory_id)
     assert forgotten["total"] == 0
     assert service.snapshot()["trace"][-1]["event_type"] == "memory.forgotten"
+
+
+def test_durable_run_can_pause_resume_cancel_and_retry(service: DemoService):
+    service.structure_intent("find a durable collaborator")
+    paused = service.pause_run()
+    assert paused["runtime"]["status"] == "PAUSED"
+    assert paused["runtime"]["controls"]["can_resume"] is True
+    with pytest.raises(DemoError, match="PAUSED"):
+        service.discover()
+
+    resumed = service.resume_run()
+    assert resumed["stage"] == "INTENT_PARSED"
+    discovered = service.discover()
+    first_run = discovered["runtime"]["run_id"]
+    cancelled = service.cancel_run()
+    assert cancelled["runtime"]["status"] == "CANCELLED"
+    assert cancelled["runtime"]["controls"]["can_retry"] is True
+
+    retried = service.retry_run()
+    assert retried["stage"] == "CANDIDATES_FOUND"
+    assert retried["runtime"]["attempt"] == 2
+    assert retried["runtime"]["run_id"] != first_run
+    assert any(run["run_id"] == first_run and run["status"] == "CANCELLED" for run in retried["runtime"]["history"])
+
+
+def test_paused_run_survives_service_restart(tmp_path: Path):
+    db_path = tmp_path / "durable.db"
+    first = DemoService(db_path)
+    first.structure_intent("persist this run")
+    paused = first.pause_run()
+
+    recovered = DemoService(db_path).snapshot()
+    assert recovered["runtime"]["run_id"] == paused["runtime"]["run_id"]
+    assert recovered["runtime"]["status"] == "PAUSED"
+    assert recovered["stage"] == "INTENT_PARSED"

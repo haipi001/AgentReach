@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
-from apps.api.main import app
+from apps.api import main as api_main
+from apps.api.service import DemoService
+
+app = api_main.app
+
+
+@pytest.fixture(autouse=True)
+def isolated_api_runtime(tmp_path, monkeypatch):
+    """HTTP tests must never mutate the developer's durable local runtime."""
+    monkeypatch.setattr(api_main, "service", DemoService(tmp_path / "api.db"))
 
 
 def test_http_golden_loop_and_page_assets():
@@ -43,3 +53,23 @@ def test_memory_search_endpoint_returns_verified_records():
     payload = response.json()
     assert "total" in payload
     assert all(item["verified"] for item in payload["items"])
+
+
+def test_runtime_control_endpoints_preserve_and_retry_work():
+    client = TestClient(app)
+    client.post("/api/demo/reset")
+    client.post("/api/demo/intent", json={"request": "find collaborator"})
+    paused = client.post("/api/runtime/pause")
+    assert paused.status_code == 200
+    assert paused.json()["runtime"]["status"] == "PAUSED"
+    assert client.post("/api/demo/discover").status_code == 409
+
+    assert client.post("/api/runtime/resume").json()["runtime"]["status"] == "RUNNING"
+    client.post("/api/demo/discover")
+    cancelled = client.post("/api/runtime/cancel").json()
+    assert cancelled["runtime"]["status"] == "CANCELLED"
+    retried = client.post("/api/runtime/retry").json()
+    assert retried["stage"] == "CANDIDATES_FOUND"
+    assert retried["runtime"]["attempt"] == 2
+    runs = client.get("/api/runtime/runs").json()
+    assert runs["total"] >= 2

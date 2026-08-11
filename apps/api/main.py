@@ -11,7 +11,7 @@ from apps.api.service import DEFAULT_DB, DemoError, DemoService, ROOT
 
 DB_PATH = Path(os.environ.get("AGENTREACH_PERSONAL_DB", DEFAULT_DB))
 service = DemoService(DB_PATH)
-if os.environ.get("AGENTREACH_RESET_ON_START", "1") == "1":
+if os.environ.get("AGENTREACH_RESET_ON_START", "0") == "1":
     service.reset()
 app = FastAPI(
     title="AgentReach Demo API",
@@ -112,6 +112,31 @@ def approve_commitment():
 @app.post("/api/demo/privacy-attack")
 def privacy_attack():
     return call(service.deny_privacy_request)
+
+
+@app.post("/api/runtime/pause")
+def pause_run():
+    return call(service.pause_run)
+
+
+@app.post("/api/runtime/resume")
+def resume_run():
+    return call(service.resume_run)
+
+
+@app.post("/api/runtime/cancel")
+def cancel_run():
+    return call(service.cancel_run)
+
+
+@app.post("/api/runtime/retry")
+def retry_run():
+    return call(service.retry_run)
+
+
+@app.get("/api/runtime/runs")
+def list_runs():
+    return service.list_runs()
 
 
 @app.post("/api/memory/search")

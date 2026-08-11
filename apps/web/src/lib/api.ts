@@ -39,6 +39,10 @@ export const demoApi = {
   peerDecision: (accepted: boolean) => request("/api/demo/peer-decision", { accepted }),
   approveCommitment: () => request("/api/demo/approve-commitment"),
   privacyAttack: () => request("/api/demo/privacy-attack"),
+  pauseRun: () => request("/api/runtime/pause"),
+  resumeRun: () => request("/api/runtime/resume"),
+  cancelRun: () => request("/api/runtime/cancel"),
+  retryRun: () => request("/api/runtime/retry"),
 };
 
 async function memoryRequest(path: string, body: unknown): Promise<MemorySearchResult> {
