@@ -61,6 +61,20 @@ export type MemorySearchResult = {
   items: MemoryRecord[];
 };
 
+export type NotificationRecord = {
+  notification_id: string;
+  run_id: string;
+  trace_id: string;
+  kind: "APPROVAL" | "WAITING" | "RESULT" | "ERROR" | "RUN";
+  title: string;
+  body: string;
+  status: "UNREAD" | "READ";
+  action: "capsule" | "connected" | "system";
+  created_at: string;
+};
+
+export type NotificationResult = { unread: number; total: number; items: NotificationRecord[] };
+
 export type DemoState = {
   stage: string;
   trace_id: string;
@@ -149,4 +163,5 @@ export type DemoState = {
     durable: boolean;
     claim_mode: string;
   };
+  notification_runtime: { unread: number; total: number; persistent: boolean };
 };

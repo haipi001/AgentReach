@@ -59,6 +59,10 @@ class WorkerJobRequest(BaseModel):
     job_id: str = Field(min_length=1, max_length=100)
 
 
+class NotificationRequest(BaseModel):
+    notification_id: str = Field(min_length=1, max_length=100)
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -164,6 +168,26 @@ def retry_worker_job(payload: WorkerJobRequest):
 @app.get("/api/runtime/runs")
 def list_runs():
     return service.list_runs()
+
+
+@app.get("/api/notifications")
+def list_notifications():
+    return service.list_notifications()
+
+
+@app.post("/api/notifications/read")
+def read_notification(payload: NotificationRequest):
+    return call(service.read_notification, payload.notification_id)
+
+
+@app.post("/api/notifications/read-all")
+def read_all_notifications():
+    return service.read_all_notifications()
+
+
+@app.post("/api/notifications/archive")
+def archive_notification(payload: NotificationRequest):
+    return call(service.archive_notification, payload.notification_id)
 
 
 @app.post("/api/connectors/check")

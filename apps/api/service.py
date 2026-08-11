@@ -181,6 +181,18 @@ class DemoService:
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS notifications (
+                    notification_id TEXT PRIMARY KEY,
+                    event_key TEXT NOT NULL UNIQUE,
+                    run_id TEXT NOT NULL,
+                    trace_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
                 """
             )
             conn.executemany(
@@ -249,6 +261,18 @@ class DemoService:
                     decision,
                     summary,
                     json.dumps(evidence or {}, ensure_ascii=False),
+                ),
+            )
+
+    def _notify(self, state: dict[str, Any], event_key: str, kind: str, title: str, body: str, action: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO notifications
+                (notification_id, event_key, run_id, trace_id, kind, title, body, status, action, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'UNREAD', ?, ?)""",
+                (
+                    f"not-{uuid4().hex[:8]}", f"{state['run_id']}:{event_key}", state["run_id"], state["trace_id"],
+                    kind, title, body, action, _iso(DEMO_NOW + timedelta(seconds=self._trace_count(state))),
                 ),
             )
 
@@ -348,6 +372,7 @@ class DemoService:
         state["runtime_status"] = "CANCELLED"
         state["finished_at"] = _iso(DEMO_NOW + timedelta(seconds=self._trace_count(state)))
         self._event(state, "personal-manager", "task-orchestration", "run.cancelled", "CANCELLED", "用户取消当前任务；已发放但未使用的授权立即失效。", {"stage": state["stage"]})
+        self._notify(state, "run.cancelled", "RUN", "任务已取消", "未完成的 Worker Job 与连接器授权均已终止。", "system")
         for grant in state["connector_grants"]:
             if grant["status"] != "USED":
                 grant["status"] = "REVOKED"
@@ -450,6 +475,7 @@ class DemoService:
                 )
             current = self._get_state() or state
             self._event(current, row["agent_id"], row["skill"], "job.failed", "FAILED", f"Worker Job {row['job_id']} 执行失败。", {"job_id": row["job_id"], "error": str(exc), "attempt": attempt})
+            self._notify(current, f"job.failed:{row['job_id']}:{attempt}", "ERROR", "Worker Job 执行失败", f"{row['skill']} 第 {attempt} 次执行失败，可在 Worker Runtime 中重试。", "system")
             return self.snapshot()
         with self._connect() as conn:
             conn.execute(
@@ -473,6 +499,33 @@ class DemoService:
             conn.execute("UPDATE worker_jobs SET status = 'PENDING', error = NULL, updated_at = ? WHERE job_id = ?", (_iso(DEMO_NOW), job_id))
         self._event(state, "personal-manager", "task-orchestration", "job.retried", "QUEUED", f"失败 Job {job_id} 已重新入队。", {"job_id": job_id, "next_attempt": row["attempt"] + 1})
         return self.snapshot()
+
+    def list_notifications(self) -> dict[str, Any]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM notifications WHERE status != 'ARCHIVED' ORDER BY rowid DESC LIMIT 50").fetchall()
+            unread = conn.execute("SELECT COUNT(*) FROM notifications WHERE status = 'UNREAD'").fetchone()[0]
+        return {"unread": unread, "total": len(rows), "items": [dict(row) for row in rows]}
+
+    def read_notification(self, notification_id: str) -> dict[str, Any]:
+        with self._connect() as conn:
+            row = conn.execute("SELECT notification_id FROM notifications WHERE notification_id = ?", (notification_id,)).fetchone()
+            if row is None:
+                raise DemoError("通知不存在。")
+            conn.execute("UPDATE notifications SET status = 'READ' WHERE notification_id = ?", (notification_id,))
+        return self.list_notifications()
+
+    def read_all_notifications(self) -> dict[str, Any]:
+        with self._connect() as conn:
+            conn.execute("UPDATE notifications SET status = 'READ' WHERE status = 'UNREAD'")
+        return self.list_notifications()
+
+    def archive_notification(self, notification_id: str) -> dict[str, Any]:
+        with self._connect() as conn:
+            row = conn.execute("SELECT notification_id FROM notifications WHERE notification_id = ?", (notification_id,)).fetchone()
+            if row is None:
+                raise DemoError("通知不存在。")
+            conn.execute("UPDATE notifications SET status = 'ARCHIVED' WHERE notification_id = ?", (notification_id,))
+        return self.list_notifications()
 
     def start_task(self, request: str) -> dict[str, Any]:
         self.reset()
@@ -746,6 +799,7 @@ class DemoService:
                 "disclosure_ratio": "4/9 (44%)",
             },
         )
+        self._notify(state, "approval.capsule", "APPROVAL", f"审查发给 {candidate['display_name']} 的上下文", "Boundary Agent 已生成最小披露胶囊，需要你的二级批准。", "capsule")
         return self.snapshot()
 
     def approve_introduction(self) -> dict[str, Any]:
@@ -782,6 +836,7 @@ class DemoService:
             f"Haipi 批准后，最小 Capsule 已发送给 {state['selected_candidate']['display_name']} Agent。",
             {"approval_id": approval_id, "introduction_id": intro["introduction_id"], "capsule_hash": _hash(state["capsule"])},
         )
+        self._notify(state, "waiting.peer", "WAITING", f"等待 {state['selected_candidate']['display_name']} 回应", "介绍已安全送达，对方的私有上下文仍不可访问。", "capsule")
         return self.snapshot()
 
     def peer_decision(self, accepted: bool) -> dict[str, Any]:
@@ -802,6 +857,7 @@ class DemoService:
                 f"{candidate['display_name']} 拒绝介绍；未创建 Commitment。",
                 {"peer": candidate["id"], "commitment_created": False},
             )
+            self._notify(state, "peer.declined", "RESULT", f"{candidate['display_name']} 拒绝了介绍", "没有创建 Commitment，也没有执行任何世界动作。", "connected")
             return self.snapshot()
         state["introduction"]["state"] = "accepted"
         state["peer_approval"] = {
@@ -830,6 +886,7 @@ class DemoService:
             f"{candidate['display_name']} 已同意介绍；生成 Commitment 草案，等待 Haipi 强确认。",
             {"peer_approval_id": state["peer_approval"]["approval_id"], "commitment_id": state["commitment"]["commitment_id"]},
         )
+        self._notify(state, "approval.commitment", "APPROVAL", "需要三级强确认", f"{candidate['display_name']} 已同意，世界行动仍需你的最终批准。", "capsule")
         return self.snapshot()
 
     def approve_commitment(self) -> dict[str, Any]:
@@ -913,6 +970,7 @@ class DemoService:
                 "两项世界动作验证通过后，经验已写回 Personal Agent Memory。",
                 {"memory_id": memory["memory_id"], "source_verdict": "VERIFIED"},
             )
+            self._notify(state, "run.verified", "RESULT", "世界变化已独立验证", "Repository 与 Agent Inbox 的两项变化均有证据，可信经验已写回。", "connected")
         return self.snapshot()
 
     def approve_and_verify_commitment(self) -> dict[str, Any]:
@@ -1198,6 +1256,8 @@ class DemoService:
             memory_count = conn.execute("SELECT COUNT(*) FROM memory_records").fetchone()[0]
             connector_rows = conn.execute("SELECT * FROM connector_registry ORDER BY connector_id").fetchall()
             job_rows = conn.execute("SELECT * FROM worker_jobs WHERE run_id = ? ORDER BY rowid", (state["run_id"],)).fetchall()
+            unread_notifications = conn.execute("SELECT COUNT(*) FROM notifications WHERE status = 'UNREAD'").fetchone()[0]
+            active_notifications = conn.execute("SELECT COUNT(*) FROM notifications WHERE status != 'ARCHIVED'").fetchone()[0]
             jobs = [
                 {
                     "job_id": row["job_id"], "agent_id": row["agent_id"], "skill": row["skill"],
@@ -1214,6 +1274,11 @@ class DemoService:
                 "succeeded": sum(1 for job in jobs if job["status"] == "SUCCEEDED"),
                 "durable": True,
                 "claim_mode": "SQLITE_IMMEDIATE",
+            }
+            result["notification_runtime"] = {
+                "unread": unread_notifications,
+                "total": active_notifications,
+                "persistent": True,
             }
             result["connector_runtime"] = {
                 "receipts": conn.execute("SELECT COUNT(*) FROM action_receipts WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],

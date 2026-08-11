@@ -1,4 +1,4 @@
-import type { DemoState, MemorySearchResult } from "@/types/agent";
+import type { DemoState, MemorySearchResult, NotificationResult } from "@/types/agent";
 
 const API = process.env.NEXT_PUBLIC_AGENTREACH_API ?? "http://127.0.0.1:8765";
 
@@ -65,4 +65,23 @@ async function memoryRequest(path: string, body: unknown): Promise<MemorySearchR
 export const memoryApi = {
   search: (query = "") => memoryRequest("/api/memory/search", { query }),
   forget: (memoryId: string) => memoryRequest("/api/memory/forget", { memory_id: memoryId }),
+};
+
+async function notificationRequest(path: string, body?: unknown): Promise<NotificationResult> {
+  const response = await fetch(`${API}${path}`, {
+    method: body === undefined && path === "/api/notifications" ? "GET" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: "no-store",
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail ?? "通知请求失败");
+  return data;
+}
+
+export const notificationApi = {
+  list: () => notificationRequest("/api/notifications"),
+  read: (notificationId: string) => notificationRequest("/api/notifications/read", { notification_id: notificationId }),
+  readAll: () => notificationRequest("/api/notifications/read-all", {}),
+  archive: (notificationId: string) => notificationRequest("/api/notifications/archive", { notification_id: notificationId }),
 };

@@ -249,3 +249,25 @@ def test_action_and_verification_are_separate_fail_closed_stages(service: DemoSe
     assert verified["stage"] == "COMPLETED"
     assert verified["verification"]["verdict"] == "VERIFIED"
     assert verified["memory_updates"]
+
+
+def test_persistent_notification_inbox_tracks_approval_and_result_lifecycle(service: DemoService):
+    state = service.start_task("notify me through the loop")
+    service.select_candidate_queued(state["candidates"][0]["id"])
+    service.approve_introduction_queued()
+    service.peer_decision_queued(True)
+    completed = service.approve_commitment_queued()
+    assert completed["stage"] == "COMPLETED"
+
+    inbox = service.list_notifications()
+    assert inbox["unread"] == 4
+    assert [item["kind"] for item in inbox["items"]] == ["RESULT", "APPROVAL", "WAITING", "APPROVAL"]
+    assert inbox["items"][0]["action"] == "connected"
+    assert all(item["run_id"] == completed["runtime"]["run_id"] for item in inbox["items"])
+
+    first_id = inbox["items"][0]["notification_id"]
+    assert service.read_notification(first_id)["unread"] == 3
+    assert service.read_all_notifications()["unread"] == 0
+    assert service.archive_notification(first_id)["total"] == 3
+    reset = service.reset()
+    assert reset["notification_runtime"]["total"] == 3

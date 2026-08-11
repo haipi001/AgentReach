@@ -100,3 +100,14 @@ def test_runtime_start_uses_durable_worker_queue():
     assert state["stage"] == "CANDIDATES_FOUND"
     assert state["worker_queue"]["succeeded"] == 2
     assert {job["agent_id"] for job in state["worker_queue"]["jobs"]} == {"intent-worker", "discovery-worker"}
+
+
+def test_notification_inbox_http_lifecycle():
+    client = TestClient(app)
+    state = client.post("/api/runtime/start", json={"request": "notification test"}).json()
+    client.post("/api/demo/select", json={"candidate_id": state["candidates"][0]["id"]})
+    inbox = client.get("/api/notifications").json()
+    assert inbox["unread"] == 1
+    notification_id = inbox["items"][0]["notification_id"]
+    assert client.post("/api/notifications/read", json={"notification_id": notification_id}).json()["unread"] == 0
+    assert client.post("/api/notifications/archive", json={"notification_id": notification_id}).json()["total"] == 0

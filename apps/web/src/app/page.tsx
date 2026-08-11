@@ -9,6 +9,7 @@ import { PersonaStudio } from "@/components/spatial/PersonaStudio";
 import { ExperienceFrame } from "@/components/experience/ExperienceFrame";
 import { ProductWorkspace } from "@/components/workspace/ProductWorkspace";
 import { SystemPanel } from "@/components/system/SystemPanel";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { demoApi } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent-store";
 
@@ -19,6 +20,7 @@ export default function Home() {
   return <ExperienceFrame>
     {view === "self" && <ProductWorkspace />}
     <SystemPanel />
+    <NotificationCenter />
     <PersonaStudio />
     <ReachScene /><CapsuleFlow /><ConnectedState /><TracePanel />
   </ExperienceFrame>;
