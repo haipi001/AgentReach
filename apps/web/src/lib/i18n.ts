@@ -54,4 +54,3 @@ export function zh(value: string | null | undefined) {
   if (!value) return "";
   return UI_TRANSLATIONS[value] ?? value;
 }
-
