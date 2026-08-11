@@ -116,6 +116,17 @@ export type DemoState = {
     receipts: number;
     mailbox_envelopes: number;
     idempotent: boolean;
+    recoverable: boolean;
+    outbox: {
+      outbox_id: string;
+      action_id: string;
+      connector_id: string;
+      status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+      attempt: number;
+      max_attempts: number;
+      error: string | null;
+      updated_at: string;
+    }[];
     connectors: {
       id: string;
       status: string;

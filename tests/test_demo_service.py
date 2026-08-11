@@ -55,6 +55,8 @@ def test_golden_loop_completes_with_independent_verification(service: DemoServic
     assert state["connector_runtime"]["receipts"] == 2
     assert state["connector_runtime"]["mailbox_envelopes"] == 1
     assert state["connector_runtime"]["idempotent"] is True
+    assert state["connector_runtime"]["recoverable"] is True
+    assert [item["status"] for item in state["connector_runtime"]["outbox"]] == ["SUCCEEDED", "SUCCEEDED"]
     assert {connector["status"] for connector in state["connector_runtime"]["connectors"]} == {"HEALTHY", "UNKNOWN"}
     assert len(state["connector_runtime"]["connectors"]) == 3
     assert len(state["agents"]) == 7
@@ -347,6 +349,59 @@ def test_action_and_verification_are_separate_fail_closed_stages(service: DemoSe
     assert verified["stage"] == "COMPLETED"
     assert verified["verification"]["verdict"] == "VERIFIED"
     assert verified["memory_updates"]
+
+
+def test_failed_outbox_action_can_be_safely_replayed(service: DemoService, monkeypatch):
+    state = advance_to_candidates(service)
+    service.select_candidate(state["candidates"][0]["id"])
+    service.approve_introduction()
+    service.peer_decision(True)
+    service.approve_commitment()
+
+    original = service._perform_outbox_action
+    failed_once = {"value": False}
+
+    def flaky(state, row, approval_id):
+        if row["action_id"] == "send-collaboration-request" and not failed_once["value"]:
+            failed_once["value"] = True
+            raise DemoError("simulated mailbox outage")
+        return original(state, row, approval_id)
+
+    monkeypatch.setattr(service, "_perform_outbox_action", flaky)
+    with pytest.raises(DemoError, match="可在 Connector Outbox 中重试"):
+        service.execute_approved_actions()
+    failed = service.snapshot()
+    assert failed["stage"] == "WAITING_ACTION_EXECUTION"
+    assert [item["status"] for item in failed["connector_runtime"]["outbox"]] == ["SUCCEEDED", "FAILED"]
+    assert failed["connector_runtime"]["receipts"] == 1
+
+    monkeypatch.setattr(service, "_perform_outbox_action", original)
+    failed_item = next(item for item in failed["connector_runtime"]["outbox"] if item["status"] == "FAILED")
+    recovered = service.retry_outbox_action(failed_item["outbox_id"])
+    assert recovered["stage"] == "COMPLETED"
+    assert recovered["verification"]["verdict"] == "VERIFIED"
+    assert [item["status"] for item in recovered["connector_runtime"]["outbox"]] == ["SUCCEEDED", "SUCCEEDED"]
+    assert [item["attempt"] for item in recovered["connector_runtime"]["outbox"]] == [1, 2]
+    assert recovered["connector_runtime"]["receipts"] == 2
+    assert recovered["connector_runtime"]["mailbox_envelopes"] == 1
+
+
+def test_interrupted_outbox_action_is_recovered_after_restart(tmp_path: Path):
+    db_path = tmp_path / "outbox.db"
+    first = DemoService(db_path)
+    state = advance_to_candidates(first)
+    first.select_candidate(state["candidates"][0]["id"])
+    first.approve_introduction()
+    first.peer_decision(True)
+    approved = first.approve_commitment()
+    first._ensure_action_outbox(approved, approved["commitment"]["party_a_approval"])
+    with first._connect() as conn:
+        conn.execute("UPDATE action_outbox SET status = 'RUNNING' WHERE action_id = 'update-repository'")
+
+    recovered = DemoService(db_path).snapshot()
+    item = next(item for item in recovered["connector_runtime"]["outbox"] if item["action_id"] == "update-repository")
+    assert item["status"] == "PENDING"
+    assert item["error"] == "recovered_after_restart"
 
 
 def test_persistent_notification_inbox_tracks_approval_and_result_lifecycle(service: DemoService):

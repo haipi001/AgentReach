@@ -145,6 +145,22 @@ class DemoService:
                     result TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS action_outbox (
+                    outbox_id TEXT PRIMARY KEY,
+                    idempotency_key TEXT NOT NULL UNIQUE,
+                    run_id TEXT NOT NULL,
+                    trace_id TEXT NOT NULL,
+                    action_id TEXT NOT NULL,
+                    connector_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    attempt INTEGER NOT NULL,
+                    max_attempts INTEGER NOT NULL,
+                    payload TEXT NOT NULL,
+                    result TEXT,
+                    error TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS task_runs (
                     run_id TEXT PRIMARY KEY,
                     task_id TEXT NOT NULL,
@@ -223,6 +239,9 @@ class DemoService:
             )
             conn.execute(
                 "UPDATE worker_jobs SET status = 'PENDING', error = 'recovered_after_restart' WHERE status = 'RUNNING'"
+            )
+            conn.execute(
+                "UPDATE action_outbox SET status = 'PENDING', error = 'recovered_after_restart' WHERE status = 'RUNNING'"
             )
 
     def _get_state(self) -> dict[str, Any] | None:
@@ -1068,15 +1087,76 @@ class DemoService:
         return self.process_next_job()
 
     def _execute_world_actions(self, state: dict[str, Any], approval_id: str) -> list[dict[str, Any]]:
-        cached = self._cached_action_results(state["trace_id"])
-        if len(cached) == 2:
-            return cached
-        self._require_connector("github-local-sandbox/v1")
-        self._require_connector("agent-mailbox/v1")
+        self._ensure_action_outbox(state, approval_id)
         for connector_id in ("github-local-sandbox/v1", "agent-mailbox/v1"):
             grant = next((item for item in state["connector_grants"] if item["connector"] == connector_id), None)
-            if grant is None or grant.get("status") != "ACTIVE" or grant.get("approval_id") != approval_id:
+            if grant is None or grant.get("status") not in {"ACTIVE", "USED"} or grant.get("approval_id") != approval_id:
                 raise DemoError(f"连接器 {connector_id} 缺少当前强审批授权。")
+        while True:
+            row = self._claim_next_outbox(state["run_id"])
+            if row is None:
+                break
+            try:
+                result = self._perform_outbox_action(state, row, approval_id)
+            except (DemoError, OSError, sqlite3.Error) as exc:
+                with self._connect() as conn:
+                    conn.execute(
+                        "UPDATE action_outbox SET status = 'FAILED', error = ?, updated_at = ? WHERE outbox_id = ?",
+                        (str(exc), _iso(DEMO_NOW), row["outbox_id"]),
+                    )
+                raise DemoError(f"世界行动 {row['action_id']} 执行失败，可在 Connector Outbox 中重试。") from exc
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE action_outbox SET status = 'SUCCEEDED', result = ?, error = NULL, updated_at = ? WHERE outbox_id = ?",
+                    (json.dumps(result, ensure_ascii=False), _iso(DEMO_NOW), row["outbox_id"]),
+                )
+        results = self._cached_action_results(state["trace_id"])
+        if len(results) != 2:
+            raise DemoError("世界行动尚未全部完成。")
+        return results
+
+    def _ensure_action_outbox(self, state: dict[str, Any], approval_id: str) -> None:
+        now = _iso(DEMO_NOW + timedelta(minutes=2))
+        rows = [
+            ("update-repository", "github-local-sandbox/v1"),
+            ("send-collaboration-request", "agent-mailbox/v1"),
+        ]
+        with self._connect() as conn:
+            for action_id, connector_id in rows:
+                key = f"{state['trace_id']}:{action_id}"
+                conn.execute(
+                    """INSERT OR IGNORE INTO action_outbox
+                    VALUES (?, ?, ?, ?, ?, ?, 'PENDING', 0, 3, ?, NULL, NULL, ?, ?)""",
+                    (
+                        f"out-{uuid4().hex[:8]}", key, state["run_id"], state["trace_id"], action_id,
+                        connector_id, json.dumps({"approval_id": approval_id}, ensure_ascii=False), now, now,
+                    ),
+                )
+
+    def _claim_next_outbox(self, run_id: str) -> sqlite3.Row | None:
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT * FROM action_outbox WHERE run_id = ? AND status = 'PENDING' ORDER BY rowid LIMIT 1",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            conn.execute(
+                "UPDATE action_outbox SET status = 'RUNNING', attempt = attempt + 1, updated_at = ? WHERE outbox_id = ? AND status = 'PENDING'",
+                (_iso(DEMO_NOW), row["outbox_id"]),
+            )
+            return conn.execute("SELECT * FROM action_outbox WHERE outbox_id = ?", (row["outbox_id"],)).fetchone()
+
+    def _perform_outbox_action(self, state: dict[str, Any], row: sqlite3.Row, approval_id: str) -> dict[str, Any]:
+        self._require_connector(row["connector_id"])
+        if row["action_id"] == "update-repository":
+            return self._write_repository_action(state, approval_id)
+        if row["action_id"] == "send-collaboration-request":
+            return self._send_mailbox_action(state, approval_id)
+        raise DemoError("Outbox 包含未知世界行动。")
+
+    def _write_repository_action(self, state: dict[str, Any], approval_id: str) -> dict[str, Any]:
         vision_path = self.repo_root / "docs" / "vision.md"
         vision_path.parent.mkdir(parents=True, exist_ok=True)
         content = (
@@ -1099,7 +1179,9 @@ class DemoService:
         self._save_action_receipt(state, repo_result)
         next(item for item in state["connector_grants"] if item["connector"] == "github-local-sandbox/v1")["status"] = "USED"
         self._event(state, "action-worker", "repository-write", "action.repository.updated", "EXECUTED", "Action Agent 已在 GitHub 本地沙箱创建 AgentReach/docs/vision.md。", repo_result)
+        return repo_result
 
+    def _send_mailbox_action(self, state: dict[str, Any], approval_id: str) -> dict[str, Any]:
         envelope_id = f"env-{uuid4().hex[:8]}"
         envelope_payload = {
             "from": "haipi-agent",
@@ -1125,7 +1207,29 @@ class DemoService:
         self._save_action_receipt(state, mailbox_result)
         next(item for item in state["connector_grants"] if item["connector"] == "agent-mailbox/v1")["status"] = "USED"
         self._event(state, "action-worker", "mailbox-send", "action.mailbox.sent", "EXECUTED", "Action Agent 已将协作请求投递到 Alice Agent Inbox。", mailbox_result)
-        return [repo_result, mailbox_result]
+        return mailbox_result
+
+    def retry_outbox_action(self, outbox_id: str) -> dict[str, Any]:
+        state = self._require("WAITING_ACTION_EXECUTION")
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM action_outbox WHERE outbox_id = ? AND run_id = ?", (outbox_id, state["run_id"])
+            ).fetchone()
+            if row is None or row["status"] != "FAILED":
+                raise DemoError("只有当前 Run 中失败的 Outbox 行动可以重试。")
+            if row["attempt"] >= row["max_attempts"]:
+                raise DemoError("Outbox 行动已达到最大重试次数。")
+            conn.execute(
+                "UPDATE action_outbox SET status = 'PENDING', error = NULL, updated_at = ? WHERE outbox_id = ?",
+                (_iso(DEMO_NOW), outbox_id),
+            )
+        self._event(state, "personal-manager", "action-recovery", "outbox.retried", "QUEUED", f"失败行动 {row['action_id']} 已重新进入 Outbox。", {"outbox_id": outbox_id, "next_attempt": row["attempt"] + 1})
+        self.enqueue_job("action-worker", "action-execution")
+        action_state = self.process_next_job()
+        if action_state["worker_queue"]["jobs"][-1]["status"] != "SUCCEEDED":
+            return action_state
+        self.enqueue_job("verifier-worker", "commitment-verification")
+        return self.process_next_job()
 
     def _cached_action_results(self, trace_id: str) -> list[dict[str, Any]]:
         with self._connect() as conn:
@@ -1339,6 +1443,7 @@ class DemoService:
             memory_count = conn.execute("SELECT COUNT(*) FROM memory_records").fetchone()[0]
             connector_rows = conn.execute("SELECT * FROM connector_registry ORDER BY connector_id").fetchall()
             job_rows = conn.execute("SELECT * FROM worker_jobs WHERE run_id = ? ORDER BY rowid", (state["run_id"],)).fetchall()
+            outbox_rows = conn.execute("SELECT * FROM action_outbox WHERE run_id = ? ORDER BY rowid", (state["run_id"],)).fetchall()
             unread_notifications = conn.execute("SELECT COUNT(*) FROM notifications WHERE status = 'UNREAD'").fetchone()[0]
             active_notifications = conn.execute("SELECT COUNT(*) FROM notifications WHERE status != 'ARCHIVED'").fetchone()[0]
             jobs = [
@@ -1367,6 +1472,16 @@ class DemoService:
                 "receipts": conn.execute("SELECT COUNT(*) FROM action_receipts WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],
                 "mailbox_envelopes": conn.execute("SELECT COUNT(*) FROM mailbox_envelopes WHERE trace_id = ?", (state["trace_id"],)).fetchone()[0],
                 "idempotent": True,
+                "outbox": [
+                    {
+                        "outbox_id": row["outbox_id"], "action_id": row["action_id"],
+                        "connector_id": row["connector_id"], "status": row["status"],
+                        "attempt": row["attempt"], "max_attempts": row["max_attempts"],
+                        "error": row["error"], "updated_at": row["updated_at"],
+                    }
+                    for row in outbox_rows
+                ],
+                "recoverable": True,
                 "connectors": [
                     {
                         "id": row["connector_id"], "status": "DISABLED" if not row["enabled"] else row["status"],

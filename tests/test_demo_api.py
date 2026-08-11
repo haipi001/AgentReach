@@ -160,3 +160,9 @@ def test_identity_http_switches_to_isolated_workspace(tmp_path, monkeypatch):
     assert restored.status_code == 200
     assert restored.json()["human_request"] == "first owner task"
     assert restored.json()["identity_runtime"]["active_profile_id"] == first_profile
+
+
+def test_outbox_retry_endpoint_rejects_unknown_action():
+    client = TestClient(app)
+    response = client.post("/api/runtime/outbox/retry", json={"outbox_id": "out-missing"})
+    assert response.status_code == 409

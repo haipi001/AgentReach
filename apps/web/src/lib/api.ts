@@ -47,6 +47,7 @@ export const demoApi = {
   switchRun: (runId: string) => request("/api/runtime/switch", { run_id: runId }),
   processNextJob: () => request("/api/runtime/jobs/process-next"),
   retryJob: (jobId: string) => request("/api/runtime/jobs/retry", { job_id: jobId }),
+  retryOutbox: (outboxId: string) => request("/api/runtime/outbox/retry", { outbox_id: outboxId }),
   checkConnector: (connectorId: string) => request("/api/connectors/check", { connector_id: connectorId }),
   toggleConnector: (connectorId: string, enabled: boolean) => request("/api/connectors/toggle", { connector_id: connectorId, enabled }),
   revokeConnectorGrant: (connectorId: string) => request("/api/connectors/revoke-grant", { connector_id: connectorId }),

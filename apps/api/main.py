@@ -82,6 +82,10 @@ class IdentitySwitchRequest(BaseModel):
     profile_id: str = Field(min_length=1, max_length=100)
 
 
+class OutboxRetryRequest(BaseModel):
+    outbox_id: str = Field(min_length=1, max_length=100)
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -198,6 +202,11 @@ def process_next_job():
 @app.post("/api/runtime/jobs/retry")
 def retry_worker_job(payload: WorkerJobRequest):
     return call(service.retry_job, payload.job_id)
+
+
+@app.post("/api/runtime/outbox/retry")
+def retry_outbox_action(payload: OutboxRetryRequest):
+    return call(service.retry_outbox_action, payload.outbox_id)
 
 
 @app.get("/api/runtime/runs")
