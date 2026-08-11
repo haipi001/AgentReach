@@ -226,3 +226,26 @@ def test_interrupted_worker_job_is_recovered_after_restart(tmp_path: Path):
     recovered = DemoService(db_path).snapshot()
     assert recovered["worker_queue"]["pending"] == 1
     assert recovered["worker_queue"]["jobs"][0]["error"] == "recovered_after_restart"
+
+
+def test_action_and_verification_are_separate_fail_closed_stages(service: DemoService):
+    state = advance_to_candidates(service)
+    service.select_candidate(state["candidates"][0]["id"])
+    service.approve_introduction()
+    service.peer_decision(True)
+
+    approved = service.approve_commitment()
+    assert approved["stage"] == "WAITING_ACTION_EXECUTION"
+    assert approved["action_results"] == []
+    assert approved["verification"] is None
+
+    acted = service.execute_approved_actions()
+    assert acted["stage"] == "WAITING_VERIFICATION"
+    assert acted["world_changed"] is True
+    assert acted["verification"] is None
+    assert all(grant["status"] == "USED" for grant in acted["connector_grants"])
+
+    verified = service.verify_world_actions()
+    assert verified["stage"] == "COMPLETED"
+    assert verified["verification"]["verdict"] == "VERIFIED"
+    assert verified["memory_updates"]

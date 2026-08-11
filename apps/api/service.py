@@ -35,7 +35,8 @@ STAGE_ORDER = [
     "WAITING_PEER_APPROVAL",
     "INTRO_ACCEPTED",
     "COMMITMENT_PROPOSED",
-    "VERIFIED",
+    "WAITING_ACTION_EXECUTION",
+    "WAITING_VERIFICATION",
     "COMPLETED",
 ]
 
@@ -388,6 +389,10 @@ class DemoService:
         supported = {
             "intent-structuring": "intent-worker",
             "candidate-discovery": "discovery-worker",
+            "context-capsule": "boundary-worker",
+            "introduction-handshake": "collaboration-worker",
+            "action-execution": "action-worker",
+            "commitment-verification": "verifier-worker",
         }
         if skill not in supported or supported[skill] != agent_id:
             raise DemoError("Worker 与 Skill 绑定不合法。")
@@ -425,6 +430,16 @@ class DemoService:
                 result = self.structure_intent(str(payload.get("request", "")))
             elif row["skill"] == "candidate-discovery":
                 result = self.discover()
+            elif row["skill"] == "context-capsule":
+                result = self.select_candidate(str(payload.get("candidate_id", "")))
+            elif row["skill"] == "introduction-handshake" and payload.get("operation") == "approve_introduction":
+                result = self.approve_introduction()
+            elif row["skill"] == "introduction-handshake" and payload.get("operation") == "peer_decision":
+                result = self.peer_decision(bool(payload.get("accepted")))
+            elif row["skill"] == "action-execution":
+                result = self.execute_approved_actions()
+            elif row["skill"] == "commitment-verification":
+                result = self.verify_world_actions()
             else:
                 raise DemoError("没有可执行该 Skill 的 Worker。")
         except DemoError as exc:
@@ -467,6 +482,18 @@ class DemoService:
         if first_job["status"] != "SUCCEEDED":
             return first
         self.enqueue_job("discovery-worker", "candidate-discovery")
+        return self.process_next_job()
+
+    def select_candidate_queued(self, candidate_id: str) -> dict[str, Any]:
+        self.enqueue_job("boundary-worker", "context-capsule", {"candidate_id": candidate_id})
+        return self.process_next_job()
+
+    def approve_introduction_queued(self) -> dict[str, Any]:
+        self.enqueue_job("collaboration-worker", "introduction-handshake", {"operation": "approve_introduction"})
+        return self.process_next_job()
+
+    def peer_decision_queued(self, accepted: bool) -> dict[str, Any]:
+        self.enqueue_job("collaboration-worker", "introduction-handshake", {"operation": "peer_decision", "accepted": accepted})
         return self.process_next_job()
 
     def _connector(self, connector_id: str) -> sqlite3.Row:
@@ -805,7 +832,7 @@ class DemoService:
         )
         return self.snapshot()
 
-    def approve_and_verify_commitment(self) -> dict[str, Any]:
+    def approve_commitment(self) -> dict[str, Any]:
         state = self._require("COMMITMENT_PROPOSED")
         revoked = [grant["connector"] for grant in state["connector_grants"] if grant["status"] == "REVOKED"]
         if revoked:
@@ -818,6 +845,7 @@ class DemoService:
                 raise DemoError(f"连接器 {grant['connector']} 授权状态异常。")
             grant["status"] = "ACTIVE"
             grant["approval_id"] = commitment_approval
+        state["stage"] = "WAITING_ACTION_EXECUTION"
         self._save_state(state)
         self._event(
             state,
@@ -825,12 +853,31 @@ class DemoService:
             "approval-engine",
             "commitment.approved",
             "ALLOW_L3",
-            "Haipi 已强确认 Commitment；进入独立只读验证。",
+            "Haipi 已强确认 Commitment；等待 Action Worker 执行审批范围内动作。",
             {"approval_id": commitment_approval, "commitment_hash": _hash(state["commitment"])},
         )
+        return self.snapshot()
+
+    def execute_approved_actions(self) -> dict[str, Any]:
+        state = self._require("WAITING_ACTION_EXECUTION")
+        commitment_approval = state["commitment"]["party_a_approval"]
         state["action_results"] = self._execute_world_actions(state, commitment_approval)
         state["world_changed"] = len(state["action_results"]) == 2
+        state["stage"] = "WAITING_VERIFICATION"
         self._save_state(state)
+        self._event(
+            state,
+            "action-worker",
+            "action-execution",
+            "actions.completed",
+            "EXECUTED_WITH_GRANT",
+            "Action Worker 已完成两项获批世界动作，等待独立 Verifier。",
+            {"approval_id": commitment_approval, "actions": state["action_results"]},
+        )
+        return self.snapshot()
+
+    def verify_world_actions(self) -> dict[str, Any]:
+        state = self._require("WAITING_VERIFICATION")
         checks = self._verification_checks(state)
         passed = all(check["passed"] for check in checks)
         state["verification"] = {
@@ -867,6 +914,21 @@ class DemoService:
                 {"memory_id": memory["memory_id"], "source_verdict": "VERIFIED"},
             )
         return self.snapshot()
+
+    def approve_and_verify_commitment(self) -> dict[str, Any]:
+        self.approve_commitment()
+        self.execute_approved_actions()
+        return self.verify_world_actions()
+
+    def approve_commitment_queued(self) -> dict[str, Any]:
+        self.approve_commitment()
+        self.enqueue_job("action-worker", "action-execution")
+        action_state = self.process_next_job()
+        action_job = action_state["worker_queue"]["jobs"][-1]
+        if action_job["status"] != "SUCCEEDED":
+            return action_state
+        self.enqueue_job("verifier-worker", "commitment-verification")
+        return self.process_next_job()
 
     def _execute_world_actions(self, state: dict[str, Any], approval_id: str) -> list[dict[str, Any]]:
         cached = self._cached_action_results(state["trace_id"])

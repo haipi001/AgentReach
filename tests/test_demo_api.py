@@ -22,11 +22,7 @@ def test_http_golden_loop_and_page_assets():
     assert root.status_code == 200
     assert root.json()["frontend"] == "http://127.0.0.1:3000"
 
-    state = client.post("/api/demo/reset").json()
-    assert state["stage"] == "CREATED"
-    state = client.post("/api/demo/intent", json={"request": "帮我寻找 Agent Identity 合作者"}).json()
-    assert state["stage"] == "INTENT_PARSED"
-    state = client.post("/api/demo/discover").json()
+    state = client.post("/api/runtime/start", json={"request": "帮我寻找 Agent Identity 合作者"}).json()
     assert state["candidates"][0]["id"] == "alice"
     state = client.post("/api/demo/select", json={"candidate_id": "alice"}).json()
     assert state["stage"] == "WAITING_USER_APPROVAL"
@@ -36,6 +32,11 @@ def test_http_golden_loop_and_page_assets():
     assert state["stage"] == "COMMITMENT_PROPOSED"
     state = client.post("/api/demo/approve-commitment").json()
     assert state["verification"]["verdict"] == "VERIFIED"
+    assert state["worker_queue"]["succeeded"] == 7
+    assert [job["agent_id"] for job in state["worker_queue"]["jobs"]] == [
+        "intent-worker", "discovery-worker", "boundary-worker", "collaboration-worker",
+        "collaboration-worker", "action-worker", "verifier-worker",
+    ]
 
 
 def test_http_invalid_transition_is_conflict():

@@ -108,22 +108,22 @@ def discover():
 
 @app.post("/api/demo/select")
 def select_candidate(payload: CandidateRequest):
-    return call(service.select_candidate, payload.candidate_id)
+    return call(service.select_candidate_queued, payload.candidate_id)
 
 
 @app.post("/api/demo/approve-introduction")
 def approve_introduction():
-    return call(service.approve_introduction)
+    return call(service.approve_introduction_queued)
 
 
 @app.post("/api/demo/peer-decision")
 def peer_decision(payload: PeerDecisionRequest):
-    return call(service.peer_decision, payload.accepted)
+    return call(service.peer_decision_queued, payload.accepted)
 
 
 @app.post("/api/demo/approve-commitment")
 def approve_commitment():
-    return call(service.approve_and_verify_commitment)
+    return call(service.approve_commitment_queued)
 
 
 @app.post("/api/demo/privacy-attack")

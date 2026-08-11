@@ -11,7 +11,7 @@ const PHASES = [
   { id: "self", label: "SELF", stages: ["CREATED", "INTENT_PARSED"] },
   { id: "discover", label: "DISCOVER", stages: ["CANDIDATES_FOUND"] },
   { id: "consent", label: "CONSENT", stages: ["WAITING_USER_APPROVAL", "INTRO_SENT", "WAITING_PEER_APPROVAL", "INTRO_ACCEPTED", "COMMITMENT_PROPOSED"] },
-  { id: "act", label: "ACT", stages: ["VERIFIED"] },
+  { id: "act", label: "ACT", stages: ["WAITING_ACTION_EXECUTION", "WAITING_VERIFICATION"] },
   { id: "evidence", label: "EVIDENCE", stages: ["COMPLETED"] },
 ];
 
