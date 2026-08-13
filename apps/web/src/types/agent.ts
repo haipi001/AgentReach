@@ -1,28 +1,12 @@
 export type AgentState = "idle" | "thinking" | "searching" | "waiting_approval" | "connected";
 export type ViewMode = "identity" | "self" | "reach" | "capsule" | "connected";
-export type PersonaForm = "human" | "monolith" | "orbital" | "totem";
 export type PersonaFinish = "matte" | "chrome" | "porcelain";
-export type FaceShape = "soft" | "oval" | "angular";
-export type SkinTone = "porcelain" | "warm" | "umber" | "deep";
-export type EyeColor = "charcoal" | "hazel" | "moss";
-export type HairStyle = "hood" | "short" | "bob" | "bare";
-export type HairColor = "ink" | "brown" | "silver";
-
-export type FaceConfig = {
-  shape: FaceShape;
-  skin: SkinTone;
-  eyes: EyeColor;
-  hairStyle: HairStyle;
-  hairColor: HairColor;
-};
 
 export type PersonaConfig = {
   name: string;
-  form: PersonaForm;
   finish: PersonaFinish;
   accent: "lichen" | "cobalt" | "ember";
   aura: number;
-  face: FaceConfig;
 };
 
 export type ExperiencePlane = "self" | "agency" | "world" | "evidence";
@@ -89,6 +73,17 @@ export type IdentityRuntime = {
   active_profile_id: string;
   local_only: boolean;
   profiles: IdentityProfile[];
+};
+
+export type OwnerBackup = {
+  format: "agentreach-owner-backup/v1";
+  exported_at: string;
+  profile: { display_name: string; agent_name: string };
+  database_base64: string;
+  database_sha256: string;
+  bytes: number;
+  encrypted: false;
+  warning: string;
 };
 
 export type OperationalMetrics = {

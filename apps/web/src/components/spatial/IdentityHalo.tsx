@@ -48,7 +48,7 @@ export function IdentityHalo() {
         })}
       </div>
       <div className="state-readout"><span>{stateLabel}</span><small>{persona.name} / 个人智能体</small></div>
-      <button className="customize-trigger" onClick={() => openStudio(true)}>自定义形象</button>
+      <button className="customize-trigger" onClick={() => openStudio(true)}>校准核心</button>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useTransform, type MotionValue } from "motion/react";
+import { AgentCore } from "@/components/spatial/AgentCore";
 
 type PortraitProps = {
   cursorX: MotionValue<number>;
@@ -11,21 +12,14 @@ type PortraitProps = {
 export function EditorialPortrait({ cursorX, cursorY, scroll }: PortraitProps) {
   const baseX = useTransform(cursorX, (value) => value * -.16);
   const baseY = useTransform(cursorY, (value) => value * -.12);
-  const upperX = useTransform([cursorX, scroll], ([pointer, progress]) => Number(pointer) * -2.5 - Number(progress) * 190);
-  const eyeX = useTransform([cursorX, scroll], ([pointer, progress]) => Number(pointer) * 3.1 + Number(progress) * 260);
-  const mouthX = useTransform([cursorX, scroll], ([pointer, progress]) => Number(pointer) * -1.8 - Number(progress) * 330);
-  const maskX = useTransform([cursorX, scroll], ([pointer, progress]) => Number(pointer) * 4.1 + Number(progress) * 390);
-  const maskRotate = useTransform(cursorY, [-8, 8], [-2.2, 2.2]);
+  const ringX = useTransform([cursorX, scroll], ([pointer, progress]) => Number(pointer) * 2.2 + Number(progress) * 120);
+  const signalX = useTransform([cursorX, scroll], ([pointer, progress]) => Number(pointer) * -1.7 - Number(progress) * 160);
+  const signalRotate = useTransform(cursorY, [-8, 8], [-2.2, 2.2]);
 
-  return <figure className="editorial-photo" aria-label="无面虚拟个人智能体">
-    <motion.div className="portrait-image portrait-base" style={{ x: baseX, y: baseY }} />
-    <motion.div className="portrait-image portrait-slice slice-upper" aria-hidden="true" style={{ x: upperX }} />
-    <motion.div className="portrait-image portrait-slice slice-eye" aria-hidden="true" style={{ x: eyeX }} />
-    <motion.div className="portrait-image portrait-slice slice-mouth" aria-hidden="true" style={{ x: mouthX }} />
-    <motion.div className="portrait-mask mask-primary" aria-hidden="true" style={{ x: maskX, rotate: maskRotate }} />
-    <motion.div className="portrait-mask mask-secondary" aria-hidden="true" style={{ x: upperX }} />
-    <motion.div className="portrait-signal signal-a" aria-hidden="true" style={{ x: eyeX }} />
-    <motion.div className="portrait-signal signal-b" aria-hidden="true" style={{ x: mouthX }} />
-    <figcaption><b>自我 / 001</b><span>面容私有 · 面具可选</span></figcaption>
+  return <figure className="editorial-photo editorial-core" aria-label="私人智能体 3D 光球核心">
+    <motion.div className="editorial-core-object" style={{ x: baseX, y: baseY }}><AgentCore/></motion.div>
+    <motion.div className="core-signal-band core-signal-a" aria-hidden="true" style={{ x: ringX, rotate: signalRotate }}/>
+    <motion.div className="core-signal-band core-signal-b" aria-hidden="true" style={{ x: signalX }}/>
+    <figcaption><b>自我 / 001</b><span>本地核心 · 状态可见</span></figcaption>
   </figure>;
 }

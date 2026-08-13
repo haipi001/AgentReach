@@ -11,7 +11,6 @@ type Store = {
   personaStudioOpen: boolean;
   systemPanelOpen: boolean;
   notificationCenterOpen: boolean;
-  avatarAsset: { url: string; name: string } | null;
   setView: (view: ViewMode) => void;
   setAgentState: (agentState: AgentState) => void;
   setActiveOrbit: (orbit: string | null) => void;
@@ -20,7 +19,6 @@ type Store = {
   setPersonaStudioOpen: (open: boolean) => void;
   setSystemPanelOpen: (open: boolean) => void;
   setNotificationCenterOpen: (open: boolean) => void;
-  setAvatarAsset: (asset: { url: string; name: string } | null) => void;
 };
 
 export const useAgentStore = create<Store>()(persist((set) => ({
@@ -28,11 +26,10 @@ export const useAgentStore = create<Store>()(persist((set) => ({
   agentState: "idle",
   activeOrbit: null,
   demo: null,
-  persona: { name: "HAIPI", form: "human", finish: "matte", accent: "lichen", aura: 0.52, face: { shape: "oval", skin: "warm", eyes: "charcoal", hairStyle: "hood", hairColor: "ink" } },
+  persona: { name: "HAIPI", finish: "chrome", accent: "lichen", aura: 0.72 },
   personaStudioOpen: false,
   systemPanelOpen: false,
   notificationCenterOpen: false,
-  avatarAsset: null,
   setView: (view) => set({ view }),
   setAgentState: (agentState) => set({ agentState }),
   setActiveOrbit: (activeOrbit) => set({ activeOrbit }),
@@ -41,13 +38,12 @@ export const useAgentStore = create<Store>()(persist((set) => ({
   setPersonaStudioOpen: (personaStudioOpen) => set({ personaStudioOpen }),
   setSystemPanelOpen: (systemPanelOpen) => set({ systemPanelOpen }),
   setNotificationCenterOpen: (notificationCenterOpen) => set({ notificationCenterOpen }),
-  setAvatarAsset: (avatarAsset) => set({ avatarAsset }),
 }), {
   name: "agentreach-persona",
-  version: 3,
+  version: 4,
   migrate: (persisted) => {
     const prior = (persisted as { persona?: Partial<PersonaConfig> })?.persona ?? {};
-    return { persona: { name: prior.name ?? "HAIPI", form: prior.form ?? "human", finish: prior.finish ?? "matte", accent: prior.accent ?? "lichen", aura: prior.aura ?? 0.52, face: { shape: "oval", skin: "warm", eyes: "charcoal", hairStyle: "hood", hairColor: "ink", ...prior.face } } as PersonaConfig };
+    return { persona: { name: prior.name ?? "HAIPI", finish: prior.finish ?? "chrome", accent: prior.accent ?? "lichen", aura: prior.aura ?? 0.72 } as PersonaConfig };
   },
   partialize: (state) => ({ persona: state.persona }),
 }));

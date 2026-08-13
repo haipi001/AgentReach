@@ -43,7 +43,7 @@ export function UnicornAtmosphere() {
       if (!active || !window.UnicornStudio) return;
       scene = await window.UnicornStudio.addScene({
         elementId: id,
-        projectId: "gzKUereYwNwPVq4UOg1X",
+        projectId: "jeRudEcskzwdXZt7Hbgr",
         scale: .45,
         dpi: 1,
         fps: 30,

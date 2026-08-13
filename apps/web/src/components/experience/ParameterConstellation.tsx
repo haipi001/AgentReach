@@ -4,7 +4,7 @@ import { motion, useTransform, type MotionValue } from "motion/react";
 import { useState } from "react";
 
 const PARAMETERS = [
-  { id: "identity", label: "身份", value: "本地 / 自有", detail: "名称、形象与声音始终绑定到你的本地身份档案。" },
+  { id: "identity", label: "核心", value: "本地 / 自有", detail: "核心名称、运行状态与信号反馈始终绑定到你的本地身份档案。" },
   { id: "memory", label: "记忆", value: "受保护 / 128", detail: "只有经过独立验证的经验才能进入持久记忆。" },
   { id: "intent", label: "意图", value: "私有 / 活跃", detail: "原始意图保持私有，只共享完成目的所需的最小声明。" },
   { id: "boundary", label: "边界", value: "正常 / 二级", detail: "策略与人工批准共同约束每一次对外行动。" },
