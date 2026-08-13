@@ -86,6 +86,11 @@ class OutboxRetryRequest(BaseModel):
     outbox_id: str = Field(min_length=1, max_length=100)
 
 
+class IdentityRestoreRequest(BaseModel):
+    backup: dict
+    display_name: str | None = Field(default=None, max_length=40)
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -126,6 +131,17 @@ def create_identity(payload: IdentityCreateRequest):
 @app.post("/api/identities/switch")
 def switch_identity(payload: IdentitySwitchRequest):
     call(service.switch_identity, payload.profile_id)
+    return service.snapshot()
+
+
+@app.get("/api/identities/export")
+def export_identity():
+    return call(service.export_active_identity)
+
+
+@app.post("/api/identities/restore")
+def restore_identity(payload: IdentityRestoreRequest):
+    call(service.restore_identity, payload.backup, payload.display_name)
     return service.snapshot()
 
 

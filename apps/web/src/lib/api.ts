@@ -1,4 +1,4 @@
-import type { DemoState, IdentityRuntime, MemorySearchResult, NotificationResult, OperationalMetrics } from "@/types/agent";
+import type { DemoState, IdentityRuntime, MemorySearchResult, NotificationResult, OperationalMetrics, OwnerBackup } from "@/types/agent";
 
 const API = process.env.NEXT_PUBLIC_AGENTREACH_API ?? "http://127.0.0.1:8765";
 
@@ -105,6 +105,13 @@ export const identityApi = {
   list: () => identityRequest("/api/identities") as Promise<IdentityRuntime>,
   create: (displayName: string, agentName: string) => identityRequest("/api/identities", { display_name: displayName, agent_name: agentName }) as Promise<IdentityRuntime>,
   switch: (profileId: string) => identityRequest("/api/identities/switch", { profile_id: profileId }) as Promise<DemoState>,
+  export: async (): Promise<OwnerBackup> => {
+    const response = await fetch(`${API}/api/identities/export`, { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail ?? "Owner 备份导出失败");
+    return data;
+  },
+  restore: (backup: OwnerBackup, displayName?: string) => identityRequest("/api/identities/restore", { backup, display_name: displayName || null }) as Promise<DemoState>,
 };
 
 export async function readOperationalMetrics(): Promise<OperationalMetrics> {

@@ -27,6 +27,14 @@ try {
   if (shell.scrollHeight < shell.viewportHeight * 1.8) throw new Error("双屏产品流程高度不足");
   if (shell.horizontalOverflow > 1) throw new Error(`页面横向溢出 ${shell.horizontalOverflow}px`);
 
+  await page.getByRole("button", { name: "打开系统控制面" }).click();
+  await page.getByRole("complementary", { name: "AgentReach 系统控制面" }).waitFor();
+  await page.getByRole("button", { name: "OWNER", exact: true }).click();
+  await page.getByText("PORTABLE OWNER DATA", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "导出 Owner 备份" }).waitFor();
+  await page.getByText("选择备份文件", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "关闭系统控制面" }).click();
+
   await page.locator("#task-workspace").evaluate((node) => window.scrollTo({ top: node.offsetTop, behavior: "auto" }));
   await page.waitForTimeout(200);
   const taskTop = await page.locator("#task-workspace").evaluate((node) => node.getBoundingClientRect().top);

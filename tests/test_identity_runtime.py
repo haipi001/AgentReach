@@ -1,4 +1,7 @@
+import pytest
+
 from apps.api.identity import LocalIdentityRuntime
+from apps.api.service import DemoError
 
 
 def test_local_identities_isolate_tasks_memory_skills_and_connectors(tmp_path):
@@ -56,3 +59,38 @@ def test_operational_metrics_are_isolated_per_owner(tmp_path):
 
     runtime.switch_identity(first_profile)
     assert runtime.operational_metrics()["runs"]["total"] == first_total
+
+
+def test_owner_backup_round_trip_restores_into_new_isolated_identity(tmp_path):
+    runtime = LocalIdentityRuntime(tmp_path / "portable-owner.db")
+    original_profile = runtime.identities()["active_profile_id"]
+    runtime.start_task("portable private task")
+    runtime.set_skill_enabled("claim-publishing", False)
+
+    backup = runtime.export_active_identity()
+    assert backup["format"] == "agentreach-owner-backup/v1"
+    assert backup["bytes"] > 0
+    assert backup["encrypted"] is False
+
+    restored_runtime = runtime.restore_identity(backup, "Recovered Owner")
+    recovered_profile = restored_runtime["active_profile_id"]
+    assert recovered_profile != original_profile
+    recovered = runtime.snapshot()
+    assert recovered["human_request"] == "portable private task"
+    assert next(item for item in recovered["skills"] if item["id"] == "claim-publishing")["enabled"] is False
+
+    runtime.start_task("recovered owner changed independently")
+    runtime.switch_identity(original_profile)
+    assert runtime.snapshot()["human_request"] == "portable private task"
+
+
+def test_owner_backup_rejects_tampering_without_creating_profile(tmp_path):
+    runtime = LocalIdentityRuntime(tmp_path / "tampered-owner.db")
+    backup = runtime.export_active_identity()
+    before = len(runtime.identities()["profiles"])
+    backup["database_sha256"] = "0" * 64
+
+    with pytest.raises(DemoError, match="完整性校验失败"):
+        runtime.restore_identity(backup)
+
+    assert len(runtime.identities()["profiles"]) == before

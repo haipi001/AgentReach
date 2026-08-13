@@ -162,6 +162,23 @@ def test_identity_http_switches_to_isolated_workspace(tmp_path, monkeypatch):
     assert restored.json()["identity_runtime"]["active_profile_id"] == first_profile
 
 
+def test_identity_backup_http_exports_and_restores_active_owner(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_main, "service", LocalIdentityRuntime(tmp_path / "identity-backup-api.db"))
+    client = TestClient(app)
+    client.post("/api/runtime/start", json={"request": "portable API task"})
+
+    exported = client.get("/api/identities/export")
+    assert exported.status_code == 200
+    backup = exported.json()
+    assert backup["format"] == "agentreach-owner-backup/v1"
+
+    restored = client.post("/api/identities/restore", json={"backup": backup, "display_name": "Recovered API Owner"})
+    assert restored.status_code == 200
+    payload = restored.json()
+    assert payload["human_request"] == "portable API task"
+    assert next(profile for profile in payload["identity_runtime"]["profiles"] if profile["active"])["display_name"] == "Recovered API Owner"
+
+
 def test_outbox_retry_endpoint_rejects_unknown_action():
     client = TestClient(app)
     response = client.post("/api/runtime/outbox/retry", json={"outbox_id": "out-missing"})

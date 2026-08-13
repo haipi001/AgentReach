@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 import json
 import sqlite3
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
@@ -134,6 +138,70 @@ class LocalIdentityRuntime:
                 (session_id, profile_id, now),
             )
         self._service()
+        return self._identity_payload()
+
+    def export_active_identity(self) -> dict[str, Any]:
+        """Create a portable, integrity-checked snapshot without exposing filesystem paths."""
+        active = self._active_row()
+        source_path = Path(active["db_path"])
+        self._service()
+        with tempfile.NamedTemporaryFile(suffix=".db") as temp:
+            with sqlite3.connect(source_path) as source, sqlite3.connect(temp.name) as target:
+                source.backup(target)
+            database = Path(temp.name).read_bytes()
+        encoded = base64.b64encode(database).decode("ascii")
+        exported_at = _now()
+        digest = hashlib.sha256(database).hexdigest()
+        return {
+            "format": "agentreach-owner-backup/v1",
+            "exported_at": exported_at,
+            "profile": {"display_name": active["display_name"], "agent_name": active["agent_name"]},
+            "database_base64": encoded,
+            "database_sha256": digest,
+            "bytes": len(database),
+            "encrypted": False,
+            "warning": "备份包含该 Owner 的本地任务、记忆与授权记录；文件未加密，请妥善保管。",
+        }
+
+    def restore_identity(self, backup: dict[str, Any], display_name: str | None = None) -> dict[str, Any]:
+        """Validate a backup and restore it as a new identity; never overwrite an existing owner."""
+        if backup.get("format") != "agentreach-owner-backup/v1":
+            raise DemoError("不支持的 Owner 备份格式。")
+        try:
+            database = base64.b64decode(str(backup["database_base64"]), validate=True)
+        except (KeyError, ValueError, binascii.Error) as exc:
+            raise DemoError("Owner 备份数据损坏或不完整。") from exc
+        if not database or len(database) > 50 * 1024 * 1024:
+            raise DemoError("Owner 备份大小无效。")
+        if hashlib.sha256(database).hexdigest() != backup.get("database_sha256"):
+            raise DemoError("Owner 备份完整性校验失败。")
+        profile = backup.get("profile") or {}
+        owner_name = (display_name or f"{profile.get('display_name', '恢复身份')}（恢复）").strip()
+        agent_name = str(profile.get("agent_name", "HAIPI")).strip()
+        if not owner_name or not agent_name:
+            raise DemoError("Owner 备份缺少身份信息。")
+        with self._connect() as conn:
+            if conn.execute("SELECT COUNT(*) FROM local_identities").fetchone()[0] >= 5:
+                raise DemoError("本地身份最多创建 5 个。")
+        profile_id = f"profile-{uuid4().hex[:8]}"
+        target_path = self.root / f"{profile_id}.db"
+        target_path.write_bytes(database)
+        try:
+            with sqlite3.connect(target_path) as restored:
+                integrity = restored.execute("PRAGMA integrity_check").fetchone()[0]
+                required = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            if integrity != "ok" or not {"demo_state", "task_runs", "memory_records"}.issubset(required):
+                raise DemoError("Owner 备份不是有效的 AgentReach 数据库。")
+            created = _now()
+            with self._connect() as conn:
+                conn.execute(
+                    "INSERT INTO local_identities VALUES (?, ?, ?, ?, ?, ?)",
+                    (profile_id, owner_name[:40], agent_name[:40], str(target_path), created, created),
+                )
+            self.switch_identity(profile_id)
+        except Exception:
+            target_path.unlink(missing_ok=True)
+            raise
         return self._identity_payload()
 
     def snapshot(self) -> dict[str, Any]:
