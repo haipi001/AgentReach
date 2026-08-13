@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AgentStage } from "@/components/spatial/AgentStage";
 import { demoApi, memoryApi } from "@/lib/api";
 import { zh } from "@/lib/i18n";
@@ -23,7 +23,13 @@ export function IdentityLoadout() {
   const persona = useAgentStore((state) => state.persona);
   const setDemo = useAgentStore((state) => state.setDemo);
   const openStudio = useAgentStore((state) => state.setPersonaStudioOpen);
-  const [active, setActive] = useState<LoadoutSection>("relationship");
+  const [active, setActive] = useState<LoadoutSection | null>(null);
+  const [dimensionSettingsOpen, setDimensionSettingsOpen] = useState(false);
+  const [visibleDimensions, setVisibleDimensions] = useState<LoadoutSection[]>(() => {
+    if (typeof window === "undefined") return Object.keys(SECTION_META) as LoadoutSection[];
+    try { return JSON.parse(localStorage.getItem("agentreach-dimensions") || "null") || Object.keys(SECTION_META); }
+    catch { return Object.keys(SECTION_META) as LoadoutSection[]; }
+  });
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
   const [busyRun, setBusyRun] = useState<string | null>(null);
   const [busyControl, setBusyControl] = useState<string | null>(null);
@@ -32,10 +38,15 @@ export function IdentityLoadout() {
   const [controlError, setControlError] = useState("");
 
   useEffect(() => { memoryApi.search("").then((result) => setMemories(result.items)).catch(() => setMemories([])); }, []);
-  const current = SECTION_META[active];
+  const current = active ? SECTION_META[active] : null;
   const activeAgents = demo?.agents.filter((agent) => agent.status === "ACTIVE").length ?? 0;
   const healthyConnectors = demo?.connector_runtime.connectors.filter((connector) => connector.enabled && connector.status === "HEALTHY").length ?? 0;
   const projects = useMemo(() => demo?.runtime.history.slice(0, 8) ?? [], [demo?.runtime.history]);
+  function toggleDimension(id: LoadoutSection) {
+    const next = visibleDimensions.includes(id) ? visibleDimensions.filter((item) => item !== id) : [...visibleDimensions, id];
+    setVisibleDimensions(next); localStorage.setItem("agentreach-dimensions", JSON.stringify(next));
+    if (active === id && !next.includes(id)) setActive(null);
+  }
 
   function scrollToWorkspace() {
     const target = document.getElementById("task-workspace");
@@ -91,14 +102,19 @@ export function IdentityLoadout() {
     memory: <div className="loadout-items memory-loadout-list">{memories.length ? memories.map((memory, index) => <article key={memory.memory_id} className={expandedMemory === memory.memory_id ? "expanded" : ""}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{memory.summary}</strong><p>{memory.kind} · TRACE {memory.trace_id}</p>{expandedMemory === memory.memory_id && <div className="memory-proof">{memory.evidence.map((proof) => <span key={`${proof.type}-${proof.label}`}><b>{proof.verified ? "✓" : "×"}</b>{zh(proof.label)} · {zh(proof.type)}</span>)}</div>}</div><aside><b>{memory.verified ? "VERIFIED" : "UNVERIFIED"}</b><small>可信度 {Math.round(memory.score * 100)}%</small><button onClick={() => { setExpandedMemory(expandedMemory === memory.memory_id ? null : memory.memory_id); setConfirmForget(null); }}>{expandedMemory === memory.memory_id ? "收起" : "证据"}</button>{expandedMemory === memory.memory_id && <button className="danger-control" disabled={!!busyControl} onClick={() => forgetMemory(memory.memory_id)}>{busyControl === memory.memory_id ? "遗忘中" : confirmForget === memory.memory_id ? "确认遗忘" : "遗忘"}</button>}</aside></article>) : <div className="loadout-empty"><b>0 VERIFIED MEMORY</b><p>完成一次经过 Verifier 的现实行动后，可信经验会出现在这里。</p></div>}</div>,
     projects: <div className="loadout-items">{projects.map((run, index) => <article key={run.run_id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{run.human_request || "未命名任务"}</strong><p>{zh(run.stage)} · 第 {run.attempt} 次执行</p></div><aside><b>{zh(run.status)}</b><button disabled={!!busyRun || !run.recoverable && run.run_id !== demo?.runtime.run_id} onClick={() => openProject(run.run_id)}>{busyRun === run.run_id ? "读取中" : run.run_id === demo?.runtime.run_id ? "进入" : run.recoverable ? "装载" : "旧记录"}</button></aside></article>)}</div>,
     boundary: <div className="loadout-boundary"><div className="boundary-meter"><strong>{healthyConnectors}/{demo?.connector_runtime.connectors.length ?? 0}</strong><span>连接器就绪</span></div><ul>{demo?.privacy_invariants.map((rule, index) => <li key={rule}><span>0{index + 1}</span>{rule}</li>)}</ul><div className="connector-strips">{demo?.connector_runtime.connectors.map((connector) => <div key={connector.id}><i className={connector.status.toLowerCase()}/><strong>{connector.id}</strong><span>{connector.enabled ? connector.status : "DISABLED"}</span><button disabled={!!busyControl} onClick={() => controlConnector(connector.id, !connector.enabled)}>{busyControl === connector.id ? "检查中" : connector.enabled ? "停用" : "检查并启用"}</button></div>)}</div></div>,
-  }[active];
+  }[active ?? "relationship"];
 
-  return <section className="identity-loadout" aria-label="AI 身份装载界面">
-    <header className="loadout-heading"><span>私人智能体 / 核心装载</span><h1>我与我的 <em>AI。</em></h1><p>不是一个聊天窗口。它是我持续装载、校准并授权行动的私人智能体。</p></header>
-    <aside className="loadout-score"><span>关系等级</span><strong>07</strong><i><b style={{ width: "78%" }}/></i><small>私人信任 / 已验证</small></aside>
-    <div className="loadout-core"><AgentStage/><div className="core-tag"><span>{persona.name} / 私人智能体核心</span><b>{zh(demo?.runtime.status ?? "ACTIVE")}</b></div><div className="scan-line"/></div>
-    <nav className="loadout-slots" aria-label="AI 装载分类">{(Object.keys(SECTION_META) as LoadoutSection[]).map((id) => { const item = SECTION_META[id]; const count = id === "skills" ? demo?.skills.length : id === "memory" ? demo?.memory_runtime.records : id === "projects" ? demo?.runtime.history.length : undefined; return <button key={id} className={active === id ? "active" : ""} onClick={() => setActive(id)}><span>{item.index}</span><i/><div><strong>{item.label}</strong><small>{item.title}</small></div>{count !== undefined && <b>{count}</b>}</button>; })}</nav>
-    <section className="loadout-detail" aria-live="polite"><header><div><span>{current.index} / {current.label}</span><h2>{current.title}</h2></div><b>{active.toUpperCase()}</b></header><p className="detail-lead">{current.description}</p>{controlError && <p className="loadout-control-error">{controlError}</p>}{detail}</section>
-    <div className="loadout-actions"><button onClick={scrollToWorkspace}><span>下滑查看任务空间</span><b>滚动 / 02 ↓</b></button><button onClick={() => openStudio(true)}><span>校准核心</span><b>设置</b></button></div>
+  const dimensions = (Object.keys(SECTION_META) as LoadoutSection[]).filter((id) => visibleDimensions.includes(id));
+  return <section className="identity-loadout core-universe" aria-label="私人智能体核心宇宙">
+    <div className="universe-meta"><span>私人智能体 / 自我宇宙</span><b>{persona.name}</b><small>{zh(demo?.runtime.status ?? "ACTIVE")} · 边界正常</small></div>
+    <div className="universe-field">
+      <div className="universe-orbit orbit-one"/><div className="universe-orbit orbit-two"/><div className="universe-orbit orbit-three"/>
+      <div className="universe-core"><AgentStage/><div className="core-signature"><span>SELF / 001</span><strong>{persona.name}</strong><small>私人智能体核心</small></div></div>
+      <svg className="dimension-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{dimensions.map((id, index) => { const angle=(-90+index*(360/Math.max(dimensions.length,1)))*Math.PI/180; const x=50+Math.cos(angle)*35; const y=50+Math.sin(angle)*35; return <g key={id}><line x1="50" y1="50" x2={x} y2={y}/><line className="return-link" x1={x} y1={y} x2="50" y2="50"/></g>; })}</svg>
+      <nav className="dimension-orbit" aria-label="核心维度">{dimensions.map((id, index) => { const item=SECTION_META[id]; const angle=-90+index*(360/Math.max(dimensions.length,1)); const count=id==="skills"?demo?.skills.length:id==="memory"?demo?.memory_runtime.records:id==="projects"?demo?.runtime.history.length:id==="relationship"?"∞":id==="boundary"?healthyConnectors:Math.round(persona.aura*100); return <button key={id} style={{ "--dimension-angle": `${angle}deg` } as CSSProperties} className={`dimension-node ${active===id?"active":""}`} onClick={() => setActive(active===id?null:id)}><i/><span>{item.label}</span><strong>{count}</strong><small>{item.index}</small></button>; })}</nav>
+    </div>
+    <div className="universe-controls"><button onClick={() => setDimensionSettingsOpen(!dimensionSettingsOpen)}>维度设置 <b>＋</b></button><button onClick={() => openStudio(true)}>核心校准 <b>↗</b></button><button onClick={scrollToWorkspace}>进入任务空间 <b>↓</b></button></div>
+    {dimensionSettingsOpen && <aside className="dimension-settings"><header><span>自定义维度</span><button onClick={() => setDimensionSettingsOpen(false)}>×</button></header><p>选择哪些能力进入你的核心宇宙。隐藏不会删除数据。</p>{(Object.keys(SECTION_META) as LoadoutSection[]).map((id) => <label key={id}><input type="checkbox" checked={visibleDimensions.includes(id)} onChange={() => toggleDimension(id)}/><span>{SECTION_META[id].label}</span><small>{SECTION_META[id].title}</small></label>)}</aside>}
+    {active && current && <aside className="dimension-detail" aria-live="polite"><header><div><span>{current.index} / {current.label}</span><h2>{current.title}</h2></div><button aria-label="关闭维度详情" onClick={() => setActive(null)}>×</button></header><p className="detail-lead">{current.description}</p>{controlError && <p className="loadout-control-error">{controlError}</p>}{detail}</aside>}
   </section>;
 }

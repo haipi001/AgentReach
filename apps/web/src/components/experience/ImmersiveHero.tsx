@@ -4,7 +4,6 @@ import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTran
 import { useRef, type MouseEvent } from "react";
 import { EditorialPortrait } from "./EditorialPortrait";
 import { ParameterConstellation } from "./ParameterConstellation";
-import { UnicornAtmosphere } from "./UnicornAtmosphere";
 import { useAgentStore } from "@/stores/agent-store";
 
 export function ImmersiveHero() {
@@ -31,7 +30,6 @@ export function ImmersiveHero() {
 
   return <section ref={track} className="hero-track" onMouseMove={move} onMouseLeave={() => { pointerX.set(0); pointerY.set(0); }}>
     <div className="hero-sticky">
-      <UnicornAtmosphere />
       <div className="hero-monogram" aria-hidden="true">AR</div>
       <motion.div className="hero-presence-stage" style={{ x, y: useTransform([y, presenceY], ([a, b]) => Number(a) + Number(b)), scale: presenceScale }}>
         <EditorialPortrait cursorX={x} cursorY={y} scroll={scrollYProgress} />
