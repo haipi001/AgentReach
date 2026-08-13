@@ -112,6 +112,8 @@ export const identityApi = {
     return data;
   },
   restore: (backup: OwnerBackup, displayName?: string) => identityRequest("/api/identities/restore", { backup, display_name: displayName || null }) as Promise<DemoState>,
+  rename: (profileId: string, displayName: string, agentName: string) => identityRequest("/api/identities/rename", { profile_id: profileId, display_name: displayName, agent_name: agentName }) as Promise<IdentityRuntime>,
+  delete: (profileId: string) => identityRequest("/api/identities/delete", { profile_id: profileId }) as Promise<IdentityRuntime>,
 };
 
 export async function readOperationalMetrics(): Promise<OperationalMetrics> {

@@ -140,6 +140,42 @@ class LocalIdentityRuntime:
         self._service()
         return self._identity_payload()
 
+    def rename_identity(self, profile_id: str, display_name: str, agent_name: str) -> dict[str, Any]:
+        display_name = display_name.strip()
+        agent_name = agent_name.strip()
+        if not display_name or not agent_name:
+            raise DemoError("身份名称和 AI 名称不能为空。")
+        with self._connect() as conn:
+            updated = conn.execute(
+                "UPDATE local_identities SET display_name = ?, agent_name = ? WHERE profile_id = ?",
+                (display_name[:40], agent_name[:40], profile_id),
+            )
+            if updated.rowcount != 1:
+                raise DemoError("本地身份不存在。")
+        return self._identity_payload()
+
+    def delete_identity(self, profile_id: str) -> dict[str, Any]:
+        active = self._active_row()
+        if profile_id == "local-owner":
+            raise DemoError("本机主身份受保护，不能删除。")
+        if profile_id == active["profile_id"]:
+            raise DemoError("不能删除当前身份，请先切换到其他 Owner。")
+        with self._lock, self._connect() as conn:
+            row = conn.execute("SELECT db_path FROM local_identities WHERE profile_id = ?", (profile_id,)).fetchone()
+            if row is None:
+                raise DemoError("本地身份不存在。")
+            db_path = Path(row["db_path"])
+            try:
+                db_path.resolve().relative_to(self.root.resolve())
+            except ValueError as exc:
+                raise DemoError("身份数据库不在受管目录中，拒绝删除。") from exc
+            conn.execute("DELETE FROM local_identities WHERE profile_id = ?", (profile_id,))
+            self._services.pop(profile_id, None)
+            db_path.unlink(missing_ok=True)
+            Path(f"{db_path}-wal").unlink(missing_ok=True)
+            Path(f"{db_path}-shm").unlink(missing_ok=True)
+        return self._identity_payload()
+
     def export_active_identity(self) -> dict[str, Any]:
         """Create a portable, integrity-checked snapshot without exposing filesystem paths."""
         active = self._active_row()

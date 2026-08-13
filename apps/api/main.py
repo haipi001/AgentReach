@@ -91,6 +91,16 @@ class IdentityRestoreRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=40)
 
 
+class IdentityUpdateRequest(BaseModel):
+    profile_id: str = Field(min_length=1, max_length=100)
+    display_name: str = Field(min_length=1, max_length=40)
+    agent_name: str = Field(min_length=1, max_length=40)
+
+
+class IdentityDeleteRequest(BaseModel):
+    profile_id: str = Field(min_length=1, max_length=100)
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -143,6 +153,16 @@ def export_identity():
 def restore_identity(payload: IdentityRestoreRequest):
     call(service.restore_identity, payload.backup, payload.display_name)
     return service.snapshot()
+
+
+@app.post("/api/identities/rename")
+def rename_identity(payload: IdentityUpdateRequest):
+    return call(service.rename_identity, payload.profile_id, payload.display_name, payload.agent_name)
+
+
+@app.post("/api/identities/delete")
+def delete_identity(payload: IdentityDeleteRequest):
+    return call(service.delete_identity, payload.profile_id)
 
 
 @app.post("/api/demo/reset")

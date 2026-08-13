@@ -179,6 +179,23 @@ def test_identity_backup_http_exports_and_restores_active_owner(tmp_path, monkey
     assert next(profile for profile in payload["identity_runtime"]["profiles"] if profile["active"])["display_name"] == "Recovered API Owner"
 
 
+def test_identity_lifecycle_http_renames_and_deletes_inactive_owner(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_main, "service", LocalIdentityRuntime(tmp_path / "identity-lifecycle-api.db"))
+    client = TestClient(app)
+    primary = client.get("/api/identities").json()["active_profile_id"]
+    temporary = client.post("/api/identities", json={"display_name": "Temp", "agent_name": "NOVA"}).json()["active_profile_id"]
+
+    renamed = client.post("/api/identities/rename", json={"profile_id": temporary, "display_name": "Project", "agent_name": "ORBIT"})
+    assert renamed.status_code == 200
+    assert next(item for item in renamed.json()["profiles"] if item["profile_id"] == temporary)["agent_name"] == "ORBIT"
+
+    assert client.post("/api/identities/delete", json={"profile_id": temporary}).status_code == 409
+    client.post("/api/identities/switch", json={"profile_id": primary})
+    deleted = client.post("/api/identities/delete", json={"profile_id": temporary})
+    assert deleted.status_code == 200
+    assert all(item["profile_id"] != temporary for item in deleted.json()["profiles"])
+
+
 def test_outbox_retry_endpoint_rejects_unknown_action():
     client = TestClient(app)
     response = client.post("/api/runtime/outbox/retry", json={"outbox_id": "out-missing"})

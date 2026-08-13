@@ -94,3 +94,27 @@ def test_owner_backup_rejects_tampering_without_creating_profile(tmp_path):
         runtime.restore_identity(backup)
 
     assert len(runtime.identities()["profiles"]) == before
+
+
+def test_identity_lifecycle_renames_and_deletes_only_inactive_managed_profile(tmp_path):
+    runtime = LocalIdentityRuntime(tmp_path / "lifecycle-owner.db")
+    primary = runtime.identities()["active_profile_id"]
+    created = runtime.create_identity("Temporary Owner", "NOVA")
+    temporary = created["active_profile_id"]
+
+    renamed = runtime.rename_identity(temporary, "Project Owner", "ORBIT")
+    profile = next(item for item in renamed["profiles"] if item["profile_id"] == temporary)
+    assert (profile["display_name"], profile["agent_name"]) == ("Project Owner", "ORBIT")
+
+    with pytest.raises(DemoError, match="不能删除当前身份"):
+        runtime.delete_identity(temporary)
+
+    runtime.switch_identity(primary)
+    managed_path = tmp_path / "profiles" / f"{temporary}.db"
+    assert managed_path.exists()
+    remaining = runtime.delete_identity(temporary)
+    assert all(item["profile_id"] != temporary for item in remaining["profiles"])
+    assert not managed_path.exists()
+
+    with pytest.raises(DemoError, match="主身份受保护"):
+        runtime.delete_identity(primary)
