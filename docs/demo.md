@@ -30,7 +30,7 @@ Input: “帮我看看 706 里面最近有没有研究 Personal Agent / Agent Id
 
 Expected top candidate: Alice. The result must cite only fixture-backed topic, domain, relationship, freshness, and availability facts. After Haipi and Alice approve, a commitment is verified and a complete trace is available.
 
-The full competition acceptance contract, evidence matrix and metric definitions are in [`docs/golden-scenario.md`](golden-scenario.md).
+The authoritative evidence is the API state, durable world effects, read-only verification result, and replayable Trace—not the animation or narration.
 
 ## Privacy failure path
 

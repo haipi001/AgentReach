@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvolutionProposal",
+  "type": "object",
+  "required": [
+    "id",
+    "observation",
+    "target_module",
+    "proposed_change",
+    "risk",
+    "test_plan",
+    "rollback_plan"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "observation": {
+      "type": "string"
+    },
+    "target_module": {
+      "type": "string"
+    },
+    "proposed_change": {
+      "type": "string"
+    },
+    "risk": {
+      "type": "string"
+    },
+    "protected_zone_touched": {
+      "type": "boolean"
+    },
+    "test_plan": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rollback_plan": {
+      "type": "string"
+    }
+  }
+}

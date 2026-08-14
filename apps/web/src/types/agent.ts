@@ -11,6 +11,75 @@ export type PersonaConfig = {
 
 export type ExperiencePlane = "self" | "agency" | "world" | "evidence";
 
+export type SurfaceDestination =
+  | { kind: "self" }
+  | { kind: "dimension"; id: "relationship" | "parameters" | "local" | "applications" | "routines" | "compute" | "files" | "skills" | "memory" | "projects" | "boundary"; focus?: string }
+  | { kind: "workspace"; runId?: string }
+  | { kind: "system"; panel?: string };
+
+export type LocalApplication = {
+  id: string;
+  name: string;
+  installed: boolean;
+  path: string | null;
+  bundle_id: string | null;
+  version: string | null;
+  authority: "NONE";
+  status: "UNAUTHORIZED" | "NOT_INSTALLED";
+  control_surfaces: string[];
+  learned_procedures: number;
+  observed_routines: number;
+  permissions: { observe: boolean; read: boolean; write: boolean; automate: boolean };
+};
+
+export type ApplicationAuthoritySnapshot = {
+  generated_at: string;
+  host: { system: string; machine: string };
+  read_only: true;
+  installed: number;
+  total: number;
+  applications: LocalApplication[];
+};
+
+export type RoutinePolicy = "IGNORE" | "LEARN" | "ASK_WHEN_READY" | "AUTO_EXECUTE";
+export type LearnedRoutine = {
+  routine_id: string;
+  name: string;
+  application_id: string;
+  application_name: string;
+  state: "OBSERVING" | "LEARNED" | "VERIFIED";
+  policy: RoutinePolicy;
+  observations: number;
+  verified_runs: number;
+  confidence: number;
+  risk: "LOW" | "MEDIUM" | "HIGH";
+  auto_execute_allowed: boolean;
+  suggestion: string;
+  semantic_steps: { index: number; label: string; boundary: string }[];
+  updated_at: string | null;
+};
+export type RoutineLearningSnapshot = { generated_at: string; source: string; routines: LearnedRoutine[] };
+
+export type ComputeAuthoritySnapshot = {
+  generated_at: string;
+  read_only: true;
+  hardware: { host: string; system: string; architecture: string; model: string; chip: string; gpu: string; gpu_cores: number; cpu_physical_cores: number; cpu_logical_cores: number };
+  resources: { cpu_percent: number; memory_total_gb: number; memory_used_gb: number; memory_percent: number; disk_total_gb: number; disk_used_gb: number; disk_percent: number };
+  providers: { id: string; name: string; kind: "LOCAL" | "CLOUD"; status: "HEALTHY" | "UNAVAILABLE" | "CONFIGURED" | "NOT_CONFIGURED"; models: string[] }[];
+  router: { policy: "LOCAL_FIRST"; route: "LOCAL" | "CLOUD" | "UNAVAILABLE"; provider: string | null; reason: string };
+};
+
+export type FileDeviceAuthoritySnapshot = {
+  generated_at: string;
+  read_only: true;
+  policy: "DENY_BY_DEFAULT";
+  scopes: { id: string; name: string; path: string; read: boolean; write: boolean; sensitive: boolean; reason: string }[];
+  recent_files: { id: string; name: string; relative_path: string; scope_id: string; scope_name: string; mime: string; size: number; size_label: string; modified_at: string; readable: boolean; writable: boolean }[];
+  evidence_artifacts: { id: string; type: string; label: string; verified: boolean; path: string | null; exists: boolean }[];
+  devices: { id: string; kind: "MAC" | "DISPLAY" | "PHONE" | "TABLET" | "STORAGE" | "USB"; name: string; status: "ONLINE" | "OFFLINE"; connection: string; authority: "READ_ONLY" | "NONE"; detail: string }[];
+  summary: { readable_scopes: number; writable_scopes: number; sensitive_scopes: number; online_devices: number };
+};
+
 export type Candidate = {
   id: string;
   agent: string;

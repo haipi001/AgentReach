@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState, type ChangeEvent } from "react";
 import { demoApi, identityApi, memoryApi, readOperationalMetrics } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent-store";
+import { focusTaskWorkspace } from "@/lib/surface-navigation";
 import type { MemorySearchResult, OperationalMetrics, OwnerBackup } from "@/types/agent";
 
 type SystemTab = "owner" | "observe" | "runs" | "agents" | "skills" | "connectors" | "memory" | "policy";
@@ -24,7 +25,7 @@ export function SystemPanel() {
   const setOpen = useAgentStore((state) => state.setSystemPanelOpen);
   const demo = useAgentStore((state) => state.demo);
   const setDemo = useAgentStore((state) => state.setDemo);
-  const setView = useAgentStore((state) => state.setView);
+  const navigate = useAgentStore((state) => state.navigate);
   const setPersona = useAgentStore((state) => state.setPersona);
   const [tab, setTab] = useState<SystemTab>("runs");
   const [testing, setTesting] = useState(false);
@@ -52,6 +53,11 @@ export function SystemPanel() {
   const [confirmDeleteProfile, setConfirmDeleteProfile] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<OperationalMetrics | null>(null);
   const [metricsBusy, setMetricsBusy] = useState(false);
+
+  function closePanel() {
+    setOpen(false);
+    navigate(window.scrollY > window.innerHeight * .72 ? { kind: "workspace", runId: demo?.runtime.run_id } : { kind: "self" });
+  }
 
   async function testBoundary() {
     if (testing) return;
@@ -109,9 +115,7 @@ export function SystemPanel() {
     try {
       const next = await demoApi.switchRun(runId);
       setDemo(next);
-      if (["WAITING_USER_APPROVAL", "WAITING_PEER_APPROVAL", "COMMITMENT_PROPOSED", "WAITING_ACTION_EXECUTION", "WAITING_VERIFICATION"].includes(next.stage)) setView("capsule");
-      else if (["COMPLETED", "PEER_REJECTED", "FAILED"].includes(next.stage)) setView("connected");
-      else setView("self");
+      focusTaskWorkspace(navigate, "smooth", runId);
     } finally { setRuntimeBusy(false); }
   }
 
@@ -167,7 +171,7 @@ export function SystemPanel() {
       setDemo(next);
       const profile = next.identity_runtime?.profiles.find((item) => item.active);
       if (profile) setPersona({ name: profile.agent_name });
-      setView("identity");
+      navigate({ kind: "self" });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) { setIdentityError(error instanceof Error ? error.message : "身份切换失败"); }
     finally { setIdentityBusy(false); }
@@ -225,7 +229,7 @@ export function SystemPanel() {
       const profile = next.identity_runtime?.profiles.find((item) => item.active);
       if (profile) setPersona({ name: profile.agent_name });
       setBackupPreview(null); setConfirmRestore(false); setRestoreName("");
-      setView("identity"); window.scrollTo({ top: 0, behavior: "smooth" });
+      navigate({ kind: "self" }); window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) { setIdentityError(error instanceof Error ? error.message : "Owner 备份恢复失败"); }
     finally { setBackupBusy(false); }
   }
@@ -261,9 +265,9 @@ export function SystemPanel() {
   }
 
   return <AnimatePresence>{open && <>
-    <motion.button className="system-scrim" aria-label="关闭系统控制面" onClick={() => setOpen(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}/>
+    <motion.button className="system-scrim" aria-label="关闭系统控制面" onClick={closePanel} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}/>
     <motion.aside className="system-panel" aria-label="AgentReach 系统控制面" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 260, damping: 30 }}>
-      <header><div><span>AGENTREACH / RUNTIME</span><strong>系统控制面</strong></div><button aria-label="关闭系统控制面" onClick={() => setOpen(false)}>×</button></header>
+      <header><div><span>AGENTREACH / RUNTIME</span><strong>系统控制面</strong></div><button aria-label="关闭系统控制面" onClick={closePanel}>×</button></header>
       <nav aria-label="系统控制面分类">{TAB_LABELS.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => chooseTab(item.id)}>{item.label}</button>)}</nav>
 
       <div className="system-panel-body">

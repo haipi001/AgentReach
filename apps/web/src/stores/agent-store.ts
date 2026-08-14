@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AgentState, DemoState, PersonaConfig, ViewMode } from "@/types/agent";
+import type { AgentState, DemoState, PersonaConfig, SurfaceDestination, ViewMode } from "@/types/agent";
 
 type Store = {
   view: ViewMode;
@@ -11,6 +11,7 @@ type Store = {
   personaStudioOpen: boolean;
   systemPanelOpen: boolean;
   notificationCenterOpen: boolean;
+  surface: SurfaceDestination;
   setView: (view: ViewMode) => void;
   setAgentState: (agentState: AgentState) => void;
   setActiveOrbit: (orbit: string | null) => void;
@@ -19,6 +20,7 @@ type Store = {
   setPersonaStudioOpen: (open: boolean) => void;
   setSystemPanelOpen: (open: boolean) => void;
   setNotificationCenterOpen: (open: boolean) => void;
+  navigate: (surface: SurfaceDestination) => void;
 };
 
 export const useAgentStore = create<Store>()(persist((set) => ({
@@ -30,6 +32,7 @@ export const useAgentStore = create<Store>()(persist((set) => ({
   personaStudioOpen: false,
   systemPanelOpen: false,
   notificationCenterOpen: false,
+  surface: { kind: "self" },
   setView: (view) => set({ view }),
   setAgentState: (agentState) => set({ agentState }),
   setActiveOrbit: (activeOrbit) => set({ activeOrbit }),
@@ -38,6 +41,12 @@ export const useAgentStore = create<Store>()(persist((set) => ({
   setPersonaStudioOpen: (personaStudioOpen) => set({ personaStudioOpen }),
   setSystemPanelOpen: (systemPanelOpen) => set({ systemPanelOpen }),
   setNotificationCenterOpen: (notificationCenterOpen) => set({ notificationCenterOpen }),
+  navigate: (surface) => set({
+    surface,
+    view: "identity",
+    activeOrbit: surface.kind === "dimension" ? surface.id.toUpperCase() : null,
+    systemPanelOpen: surface.kind === "system",
+  }),
 }), {
   name: "agentreach-persona",
   version: 4,

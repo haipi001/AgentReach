@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Affordance",
+  "type": "object",
+  "required": [
+    "id",
+    "entity_id",
+    "action_type",
+    "availability"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "entity_id": {
+      "type": "string"
+    },
+    "action_type": {
+      "type": "string"
+    },
+    "availability": {
+      "enum": [
+        "available",
+        "approval_required",
+        "unavailable"
+      ]
+    },
+    "reason": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_credentials": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risk": {
+      "type": "string"
+    }
+  }
+}

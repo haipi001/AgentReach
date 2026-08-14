@@ -4,7 +4,7 @@
 
 AgentReach is privacy-preserving collaboration infrastructure for independently owned personal agents. It separates private intent from shared claims and enables a personal agent to discover a relevant person, disclose only purpose-bound context, obtain mutual consent, record a commitment, and independently verify the result.
 
-The competition slice is not a social feed, project-management suite, DAO, identity wallet, or global agent network.
+The current product slice is not a social feed, project-management suite, DAO, identity wallet, or global agent network.
 
 ## 2. Golden demo
 

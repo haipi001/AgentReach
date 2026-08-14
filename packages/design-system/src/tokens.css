@@ -1,0 +1,7 @@
+:root {
+  --ar-color-canvas:#f1f3ef; --ar-color-canvas-muted:#e8ede8; --ar-color-surface:rgba(246,248,244,.76); --ar-color-surface-solid:#f6f8f4;
+  --ar-color-ink:#101613; --ar-color-muted:#68736d; --ar-color-line:rgba(20,39,31,.15); --ar-color-signal:#65d9ad; --ar-color-signal-ink:#143f31; --ar-color-danger:#833d34;
+  --ar-space-1:.25rem; --ar-space-2:.5rem; --ar-space-3:.75rem; --ar-space-4:1rem; --ar-space-6:1.5rem; --ar-space-8:2rem; --ar-space-12:3rem;
+  --ar-radius-control:.2rem; --ar-radius-surface:.35rem; --ar-font-display:"Mona Sans","Avenir Next",sans-serif; --ar-font-body:"Mona Sans","Avenir Next",sans-serif; --ar-font-mono:"SFMono-Regular",Consolas,monospace;
+  --ar-motion-standard:cubic-bezier(.22,.76,.24,1); --ar-z-base:0; --ar-z-chrome:40; --ar-z-surface:100; --ar-z-protected:140; --ar-z-debug:180;
+}

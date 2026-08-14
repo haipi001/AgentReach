@@ -1,0 +1,17 @@
+{
+  "id": "context-capsule",
+  "version": "1.0.0",
+  "category": "approval",
+  "allowedSurfaces": [
+    "halo",
+    "workspace"
+  ],
+  "risk": "restricted",
+  "protected": true,
+  "evolvable": false,
+  "accessibility": true,
+  "events": [
+    "approve",
+    "reject"
+  ]
+}

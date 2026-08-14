@@ -11,7 +11,7 @@ Updated: 2026-08-11
 | Spatial Self Space | Complete | 100% | R3F avatar, orbit navigation, Reach and evidence scenes | Accessibility and performance budget |
 | Spatial atmosphere | In progress | 80% | Interactive editorial portrait, local R3F renderer and long-scroll system anatomy | Freeze visual scope; only accessibility/performance blockers before submission |
 | Persona Studio | In progress | 85% | Face shape, skin, eyes, hair, local GLB import, local persistence | Morph-target binding and exportable profiles |
-| Human avatar v2 | Deferred after preliminary | 65% | Parametric WebGL head and session-only rigged GLB renderer exist; appearance remains separated from authority | Resume morph/rig work only after competition evidence gates |
+| Human avatar v2 | Deferred | 65% | Parametric WebGL head and session-only rigged GLB renderer exist; appearance remains separated from authority | Resume morph/rig work after protocol and evidence gates |
 | Connector plane | In progress | 45% | Local GitHub sandbox, durable mailbox, scoped grants, persistent idempotency receipts | OAuth, revocation, retries |
 | Multi-agent runtime | In progress | 30% | Six role identities, deterministic orchestration, state transitions and Trace exist | Prove official AgentTeams mapping and minimum runnable integration |
 | Trust domain deployment | Planned | 10% | Claims and boundary contracts exist | PostgreSQL, domain service, deployment manifests |
@@ -26,14 +26,12 @@ The current build proves one complete loop:
 
 The next avatar milestone is a morph-target adapter and an isolated local GPU service contract for SMPL-X body generation and MMPose pose input. The next connector milestone remains real GitHub OAuth, revocation, and retries.
 
-## Preliminary submission gates
+## Release readiness
 
 | Gate | Status | Exit evidence |
 | --- | --- | --- |
 | Documentation consistency | Complete | README and progress table distinguish presentation UI from authoritative protocol evidence |
-| Quantified Golden Scenario | Complete | `docs/golden-scenario.md` defines actors, states, actions, evidence and metrics |
-| 500-character project summary | Complete | `docs/submission/preliminary-summary-zh.md` is 475 non-whitespace characters |
-| One-pager and 12-15 slide deck | In progress | One-pager complete; slide source and exported PDF remain |
+| Quantified acceptance scenario | Complete | Actors, states, actions, evidence and metrics are defined locally |
 | AgentTeams implementation map | Pending | Every role/event/state mapped to current code and framework capability |
 | Skill engineering evidence | Pending | Six Skills include version, failure, retry, rollback and evaluation contracts |
 | Cloud Skill or adapter | Pending | One necessary, auditable integration with a local fallback |

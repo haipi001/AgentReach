@@ -217,6 +217,11 @@ class DemoService:
                     action TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS routine_policies (
+                    routine_id TEXT PRIMARY KEY,
+                    policy TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
             run_columns = {row["name"] for row in conn.execute("PRAGMA table_info(task_runs)").fetchall()}
@@ -451,6 +456,57 @@ class DemoService:
             ).fetchall()
         items = [dict(row) | {"recoverable": bool(row["recoverable"])} for row in rows]
         return {"total": len(items), "items": items}
+
+    def routine_learning(self) -> dict[str, Any]:
+        """Derive procedure candidates from durable execution evidence, never synthetic counts."""
+        with self._connect() as conn:
+            observed = conn.execute("SELECT COUNT(*) FROM task_runs WHERE human_request IS NOT NULL").fetchone()[0]
+            verified = conn.execute("SELECT COUNT(*) FROM task_runs WHERE status = 'COMPLETED' AND stage = 'COMPLETED'").fetchone()[0]
+            memory_evidence = conn.execute("SELECT COUNT(*) FROM memory_records WHERE kind = 'verified_experience'").fetchone()[0]
+            policy_row = conn.execute("SELECT policy, updated_at FROM routine_policies WHERE routine_id = ?", ("collaboration.discovery-and-consent",)).fetchone()
+        confidence = min(0.96, 0.2 + min(observed, 8) * 0.07 + min(verified, 2) * 0.1)
+        state = "VERIFIED" if verified and memory_evidence else "LEARNED" if observed >= 3 else "OBSERVING"
+        policy = policy_row["policy"] if policy_row else "ASK_WHEN_READY"
+        return {
+            "generated_at": _iso(DEMO_NOW),
+            "source": "durable_run_and_verifier_evidence",
+            "routines": [{
+                "routine_id": "collaboration.discovery-and-consent",
+                "name": "从私人意图到可验证协作",
+                "application_id": "agentreach",
+                "application_name": "AgentReach",
+                "state": state,
+                "policy": policy,
+                "observations": observed,
+                "verified_runs": verified,
+                "confidence": round(confidence, 2),
+                "risk": "MEDIUM",
+                "auto_execute_allowed": False,
+                "suggestion": "保留最小披露与三级强确认；只自动化本地发现与证据整理。",
+                "semantic_steps": [
+                    {"index": 1, "label": "结构化私人意图", "boundary": "LOCAL_ONLY"},
+                    {"index": 2, "label": "在本地候选中进行发现", "boundary": "LOCAL_ONLY"},
+                    {"index": 3, "label": "生成最小上下文胶囊", "boundary": "APPROVAL_REQUIRED"},
+                    {"index": 4, "label": "等待对方独立同意", "boundary": "MUTUAL_CONSENT"},
+                    {"index": 5, "label": "预览并强确认现实行动", "boundary": "STRONG_APPROVAL"},
+                    {"index": 6, "label": "独立验证世界变化后写入记忆", "boundary": "VERIFIED_ONLY"},
+                ],
+                "updated_at": policy_row["updated_at"] if policy_row else None,
+            }],
+        }
+
+    def set_routine_policy(self, routine_id: str, policy: str) -> dict[str, Any]:
+        if routine_id != "collaboration.discovery-and-consent":
+            raise DemoError("Routine 不存在。")
+        allowed = {"IGNORE", "LEARN", "ASK_WHEN_READY"}
+        if policy not in allowed:
+            raise DemoError("中风险协作程序不允许自动执行。")
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO routine_policies(routine_id, policy, updated_at) VALUES (?, ?, ?)",
+                (routine_id, policy, _iso(DEMO_NOW)),
+            )
+        return self.routine_learning()
 
     def operational_metrics(self) -> dict[str, Any]:
         """Aggregate durable runtime health for the active local owner."""

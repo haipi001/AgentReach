@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Entity",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "name"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "application",
+        "file",
+        "device",
+        "person",
+        "agent",
+        "organization",
+        "company",
+        "community",
+        "project",
+        "repository",
+        "service",
+        "web_resource",
+        "cloud_resource",
+        "knowledge_source"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}

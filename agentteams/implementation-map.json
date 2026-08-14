@@ -1,0 +1,24 @@
+{
+  "schema": "agentreach.agentteams-map/v1",
+  "framework_basis": "AgentTeams",
+  "personal_agent_identity": "haipi-agent",
+  "manager": {
+    "id": "personal-manager",
+    "implementation": "apps.api.service.DemoService",
+    "dispatch": "process_next_job",
+    "state_store": "task_runs + worker_jobs",
+    "context_boundary": "owner-scoped SQLite runtime"
+  },
+  "workers": [
+    {"id": "intent-worker", "skill": "intent-structuring", "entrypoint": "structure_intent", "input": "private human request", "output": "validated private intent", "permission": "local-write"},
+    {"id": "discovery-worker", "skill": "candidate-discovery", "entrypoint": "discover", "input": "intent + shared claims + local relationship context", "output": "ranked candidates", "permission": "local-read"},
+    {"id": "boundary-worker", "skill": "context-capsule", "entrypoint": "select_candidate_queued", "input": "selected candidate + private context", "output": "minimum context capsule", "permission": "prepare-only"},
+    {"id": "collaboration-worker", "skill": "introduction-handshake", "entrypoint": "approve_introduction_queued", "input": "approved capsule", "output": "mailbox introduction + peer decision", "permission": "L2-approved external-write"},
+    {"id": "action-worker", "skill": "claim-publishing", "entrypoint": "approve_commitment_queued", "input": "L3-approved commitment", "output": "idempotent connector receipts", "permission": "scoped-grant external-write"},
+    {"id": "verifier-worker", "skill": "commitment-verification", "entrypoint": "process_next_job", "input": "immutable receipts + protocol trace", "output": "verification report + evidence", "permission": "read-only"}
+  ],
+  "context_transfer": "worker_jobs.payload + run-scoped state snapshot",
+  "state_tracking": "CREATED -> INTENT_PARSED -> CANDIDATES_FOUND -> approval -> action -> verification -> COMPLETED",
+  "failure_model": "failed jobs remain durable and bounded to three attempts; invalid transitions fail closed",
+  "trace_model": "every worker event records trace_id, agent, skill, decision, summary and evidence"
+}

@@ -5,13 +5,14 @@ import { useEffect, useState } from "react";
 import { demoApi, notificationApi } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent-store";
 import type { NotificationRecord, NotificationResult } from "@/types/agent";
+import { focusTaskWorkspace } from "@/lib/surface-navigation";
 
 export function NotificationCenter() {
   const open = useAgentStore((state) => state.notificationCenterOpen);
   const setOpen = useAgentStore((state) => state.setNotificationCenterOpen);
   const demo = useAgentStore((state) => state.demo);
   const setDemo = useAgentStore((state) => state.setDemo);
-  const setView = useAgentStore((state) => state.setView);
+  const navigate = useAgentStore((state) => state.navigate);
   const setSystemOpen = useAgentStore((state) => state.setSystemPanelOpen);
   const [result, setResult] = useState<NotificationResult | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export function NotificationCenter() {
     if (item.run_id !== demo?.runtime.run_id) return;
     setOpen(false);
     if (item.action === "system") setSystemOpen(true);
-    else setView(item.action);
+    else focusTaskWorkspace(navigate, "smooth", item.run_id);
   }
 
   return <AnimatePresence>{open && <>

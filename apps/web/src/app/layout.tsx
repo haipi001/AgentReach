@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "@agentreach/design-system/tokens.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

@@ -1,0 +1,14 @@
+{
+  "schema": "agentreach.nacos-registry-export/v1",
+  "mode": "offline-demo-export",
+  "namespace": "agentreach-preliminary",
+  "contains_private_data": false,
+  "registries": {
+    "agents": "agentteams/agents.yaml",
+    "skills": ["intent-structuring", "candidate-discovery", "context-capsule", "introduction-handshake", "claim-publishing", "commitment-verification"],
+    "tool_contracts": "mcp_servers/tool-contracts.json",
+    "protocol_version": "v1"
+  },
+  "excluded": ["personal memory", "private relationships", "private intent", "credentials"],
+  "release_policy": "reviewed versioned configuration only; never canonical personal state"
+}

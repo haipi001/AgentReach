@@ -119,6 +119,7 @@ export function AgentCore() {
 
   return <div style={style} className={`agent-core finish-${persona.finish} accent-${persona.accent}`} role="img" aria-label={`私人智能体 3D 球形核心，场强 ${Math.round(persona.aura * 100)}%`} onPointerMove={(event) => { const rect=event.currentTarget.getBoundingClientRect(); pointer.current={ x:(event.clientX-rect.left)/rect.width*2-1, y:1-(event.clientY-rect.top)/rect.height*2 }; }} onPointerLeave={() => { pointer.current={x:0,y:0}; }}>
     <div className="agent-core-aura" aria-hidden="true"/>
+    <div className="agent-core-fallback" aria-hidden="true"><i/><i/><i/></div>
     <canvas ref={canvasRef} className="agent-core-canvas" aria-hidden="true"/>
     <div className="agent-core-rings" aria-hidden="true"><i/><i/><i/></div>
   </div>;

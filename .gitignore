@@ -11,3 +11,10 @@ data/*.db
 data/profiles/
 logs/*.log
 !.gitkeep
+
+# Local-only private presentation materials
+docs/submission/
+docs/golden-scenario.md
+tmp/presentations/
+*.pptx
+*.key

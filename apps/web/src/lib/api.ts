@@ -1,4 +1,4 @@
-import type { DemoState, IdentityRuntime, MemorySearchResult, NotificationResult, OperationalMetrics, OwnerBackup } from "@/types/agent";
+import type { ApplicationAuthoritySnapshot, ComputeAuthoritySnapshot, DemoState, FileDeviceAuthoritySnapshot, IdentityRuntime, MemorySearchResult, NotificationResult, OperationalMetrics, OwnerBackup, RoutineLearningSnapshot, RoutinePolicy } from "@/types/agent";
 
 const API = process.env.NEXT_PUBLIC_AGENTREACH_API ?? "http://127.0.0.1:8765";
 
@@ -120,5 +120,42 @@ export async function readOperationalMetrics(): Promise<OperationalMetrics> {
   const response = await fetch(`${API}/api/runtime/metrics`, { cache: "no-store" });
   const data = await response.json();
   if (!response.ok) throw new Error(data.detail ?? "运行指标读取失败");
+  return data;
+}
+
+export async function readLocalApplications(): Promise<ApplicationAuthoritySnapshot> {
+  const response = await fetch(`${API}/api/local-world/applications`, { cache: "no-store" });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail ?? "无法读取本机应用空间");
+  return data;
+}
+
+export async function readRoutineLearning(): Promise<RoutineLearningSnapshot> {
+  const response = await fetch(`${API}/api/local-world/routines`, { cache: "no-store" });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail ?? "无法读取程序学习状态");
+  return data;
+}
+
+export async function readComputeAuthority(): Promise<ComputeAuthoritySnapshot> {
+  const response = await fetch(`${API}/api/local-world/compute`, { cache: "no-store" });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail ?? "无法读取本机计算空间");
+  return data;
+}
+
+export async function readFileDeviceAuthority(): Promise<FileDeviceAuthoritySnapshot> {
+  const response = await fetch(`${API}/api/local-world/files-devices`, { cache: "no-store" });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail ?? "无法读取文件与设备空间");
+  return data;
+}
+
+export async function updateRoutinePolicy(routineId: string, policy: RoutinePolicy): Promise<RoutineLearningSnapshot> {
+  const response = await fetch(`${API}/api/local-world/routines/policy`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ routine_id: routineId, policy }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail ?? "无法更新程序学习策略");
   return data;
 }

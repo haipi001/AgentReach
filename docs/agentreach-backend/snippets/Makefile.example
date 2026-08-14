@@ -1,0 +1,26 @@
+.PHONY: db api test lint contracts security eval mcp
+
+db:
+	docker compose up -d postgres
+
+api:
+	cd backend && uv run uvicorn agentreach.main:app --app-dir src --reload --port 8000
+
+test:
+	cd backend && uv run pytest -q --cov=agentreach
+
+lint:
+	cd backend && uv run ruff check .
+	cd backend && uv run mypy src
+
+contracts:
+	cd backend && uv run pytest tests/contracts -q
+
+security:
+	cd backend && uv run pytest tests/security -q
+
+eval:
+	cd backend && uv run pytest tests/evals -q
+
+mcp:
+	cd backend && uv run mcp dev src/agentreach/mcp/personal/server.py

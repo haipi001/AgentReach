@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentReach UISurfaceSchema",
+  "type": "object",
+  "required": [
+    "id",
+    "version",
+    "layout",
+    "components"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "layout": {
+      "enum": [
+        "spatial-orbit",
+        "spatial-field",
+        "workspace-grid",
+        "list"
+      ]
+    },
+    "centerComponent": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "componentId"
+        ],
+        "properties": {
+          "componentId": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "zone": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

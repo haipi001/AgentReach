@@ -1,0 +1,1 @@
+{"name":"@agentreach/surface-runtime","version":"0.1.0","private":true,"type":"module","exports":{".":"./src/index.ts"},"dependencies":{"@agentreach/component-registry":"workspace:*","@agentreach/ui-schema":"workspace:*","react":"^19.2.0"},"devDependencies":{"@types/react":"^19.2.2"}}

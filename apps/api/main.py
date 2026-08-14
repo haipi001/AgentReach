@@ -8,10 +8,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from apps.api.identity import LocalIdentityRuntime
+from apps.api.applications import ApplicationAuthority
+from apps.api.compute import ComputeAuthority
+from apps.api.files_devices import FileDeviceAuthority
 from apps.api.service import DEFAULT_DB, DemoError, ROOT
 
 DB_PATH = Path(os.environ.get("AGENTREACH_PERSONAL_DB", DEFAULT_DB))
+ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get("AGENTREACH_ALLOWED_ORIGINS", "http://127.0.0.1:3000,http://localhost:3000").split(",") if origin.strip()]
 service = LocalIdentityRuntime(DB_PATH)
+application_authority = ApplicationAuthority()
+compute_authority = ComputeAuthority()
+file_device_authority = FileDeviceAuthority(ROOT)
 if os.environ.get("AGENTREACH_RESET_ON_START", "0") == "1":
     service.reset()
 app = FastAPI(
@@ -21,7 +28,7 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:3000", "http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
@@ -101,6 +108,11 @@ class IdentityDeleteRequest(BaseModel):
     profile_id: str = Field(min_length=1, max_length=100)
 
 
+class RoutinePolicyRequest(BaseModel):
+    routine_id: str = Field(min_length=1, max_length=120)
+    policy: str = Field(min_length=1, max_length=40)
+
+
 def call(action, *args):
     try:
         return action(*args)
@@ -126,6 +138,31 @@ def health():
 @app.get("/api/demo")
 def get_demo():
     return service.snapshot()
+
+
+@app.get("/api/local-world/applications")
+def list_local_applications():
+    return application_authority.snapshot()
+
+
+@app.get("/api/local-world/routines")
+def list_routines():
+    return service.routine_learning()
+
+
+@app.get("/api/local-world/compute")
+def read_compute():
+    return compute_authority.snapshot()
+
+
+@app.get("/api/local-world/files-devices")
+def read_files_devices():
+    return file_device_authority.snapshot(service.snapshot().get("evidence", []))
+
+
+@app.post("/api/local-world/routines/policy")
+def update_routine_policy(payload: RoutinePolicyRequest):
+    return call(service.set_routine_policy, payload.routine_id, payload.policy)
 
 
 @app.get("/api/identities")

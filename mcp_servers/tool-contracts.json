@@ -1,0 +1,55 @@
+{
+  "schema": "agentreach.tool-contracts/v1",
+  "mcp_status": "equivalent-contract-ready",
+  "migration": "Each adapter exposes stable JSON input/output and can be wrapped by an MCP server without changing Agency Kernel semantics.",
+  "tools": [
+    {
+      "name": "personal.intent_create",
+      "boundary": "local-only",
+      "auth": "active owner session",
+      "input_schema": "protocol/intent/schema.json",
+      "output_schema": "protocol/intent/schema.json",
+      "side_effect": "local-write",
+      "retry": "not automatic on validation failure",
+      "idempotency": "run_id + intent hash",
+      "audit": "intent.created",
+      "degrade": "fail closed"
+    },
+    {
+      "name": "reach.claim_search",
+      "boundary": "shared claims read-only",
+      "auth": "trust-domain membership",
+      "input_schema": "protocol/claim/schema.json filters",
+      "output_schema": "array<protocol/claim/schema.json>",
+      "side_effect": "none",
+      "retry": "bounded read retry",
+      "idempotency": "read-only",
+      "audit": "entity.discovered",
+      "degrade": "return unavailable with no private fallback disclosure"
+    },
+    {
+      "name": "mailbox.envelope_send",
+      "boundary": "network",
+      "auth": "active scoped grant + sender approval",
+      "input_schema": "protocol/introduction/schema.json",
+      "output_schema": "delivery receipt",
+      "side_effect": "external-write",
+      "retry": "outbox max_attempts=3",
+      "idempotency": "trace_id + action_id",
+      "audit": "action.completed",
+      "degrade": "durable failed outbox row"
+    },
+    {
+      "name": "audit.trace_query",
+      "boundary": "owner-scoped read-only",
+      "auth": "active owner session",
+      "input_schema": "trace_id",
+      "output_schema": "ordered audit events + evidence refs",
+      "side_effect": "none",
+      "retry": "safe read retry",
+      "idempotency": "read-only",
+      "audit": "query not added to immutable task evidence",
+      "degrade": "explicit unavailable"
+    }
+  ]
+}

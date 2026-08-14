@@ -23,7 +23,7 @@ try {
     viewportHeight: window.innerHeight,
     horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
   }));
-  if (shell.dimensions !== 6 || shell.cores < 2 || !shell.hasTask || !shell.hasCalibration) throw new Error(`产品结构不完整：${JSON.stringify(shell)}`);
+  if (shell.dimensions !== 7 || shell.cores < 2 || !shell.hasTask || !shell.hasCalibration) throw new Error(`产品结构不完整：${JSON.stringify(shell)}`);
 
   await page.getByRole("button", { name: /关系/ }).click();
   await page.getByRole("heading", { name: "你与 HAIPI" }).waitFor();

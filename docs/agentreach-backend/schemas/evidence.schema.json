@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evidence",
+  "type": "object",
+  "required": [
+    "id",
+    "action_id",
+    "verifier",
+    "timestamp",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "action_id": {
+      "type": "string"
+    },
+    "verifier": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "verified",
+        "failed",
+        "inconclusive"
+      ]
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

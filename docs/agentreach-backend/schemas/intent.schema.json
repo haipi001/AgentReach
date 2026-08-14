@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Intent",
+  "type": "object",
+  "required": [
+    "id",
+    "owner_id",
+    "type",
+    "visibility",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "owner_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "topic": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "constraints": {
+      "type": "object"
+    },
+    "visibility": {
+      "enum": [
+        "private",
+        "relationship",
+        "domain",
+        "public"
+      ]
+    },
+    "status": {
+      "enum": [
+        "active",
+        "paused",
+        "completed",
+        "expired"
+      ]
+    }
+  }
+}
